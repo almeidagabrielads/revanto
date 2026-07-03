@@ -86,6 +86,7 @@ model Pessoa {
   receitas           Receita[]
   orcamentos         OrcamentoPlanejado[]
   investimentos      Investimento[]
+  posicoesPatrimonio PosicaoPatrimonio[]
 
   @@unique([householdId, nome])
 }
@@ -173,12 +174,12 @@ model Lancamento {
   createdByUserId  String?
   updatedByUserId  String?
 
-  household    Household     @relation(fields: [householdId], references: [id])
-  categoria    Categoria?    @relation(fields: [categoriaId], references: [id])
-  subcategoria Subcategoria? @relation(fields: [subcategoriaId], references: [id])
-  banco        Banco         @relation(fields: [bancoId], references: [id])
-  pessoaDivisao Pessoa       @relation("LancamentoDivisao", fields: [pessoaDivisaoId], references: [id])
-  pessoaPagou  Pessoa        @relation("LancamentoPagou", fields: [pessoaPagouId], references: [id])
+  household     Household     @relation(fields: [householdId], references: [id])
+  categoria     Categoria?    @relation(fields: [categoriaId], references: [id])
+  subcategoria  Subcategoria? @relation(fields: [subcategoriaId], references: [id])
+  banco         Banco         @relation(fields: [bancoId], references: [id])
+  pessoaDivisao Pessoa        @relation("LancamentoDivisao", fields: [pessoaDivisaoId], references: [id])
+  pessoaPagou   Pessoa        @relation("LancamentoPagou", fields: [pessoaPagouId], references: [id])
 
   @@unique([householdId, hashImportacao])
   @@index([householdId, data])
@@ -260,6 +261,9 @@ model Investimento {
 model PosicaoPatrimonio {
   id            String   @id @default(cuid())
   bancoId       String
+  // Titular da posição (RF13: histórico por banco/titular). Null = posição
+  // do casal/família, sem titular individual definido.
+  pessoaId      String?
   // Sempre o 1º dia do mês em UTC; representa o mês de referência da posição
   mes           DateTime @db.Date
   valorCentavos Int
@@ -269,7 +273,25 @@ model PosicaoPatrimonio {
 
   household Household @relation(fields: [householdId], references: [id])
   banco     Banco     @relation(fields: [bancoId], references: [id])
+  pessoa    Pessoa?   @relation(fields: [pessoaId], references: [id])
 
-  @@unique([householdId, bancoId, mes])
+  // NULLS NOT DISTINCT aplicado via migration (ver 20260702010200) — trata
+  // pessoaId nulo como igual para impedir duplicatas de posição "do casal".
+  @@unique([householdId, bancoId, pessoaId, mes])
   @@index([householdId, mes])
+}
+
+// ─── CDI (RF14) ───────────────────────────────────────────────────────────────
+
+// Índice CDI mensal (% ao mês), cacheado a partir da API do BCB (SGS série
+// 4391 — "Taxa de juros - CDI acumulada no mês"). Não é escopado por
+// household: é um índice econômico público, compartilhado entre todos os
+// tenants.
+model CdiMensal {
+  id         String   @id @default(cuid())
+  // Sempre o 1º dia do mês em UTC.
+  mes        DateTime @unique @db.Date
+  percentual Decimal  @db.Decimal(6, 4)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 }

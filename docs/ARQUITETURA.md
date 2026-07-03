@@ -75,7 +75,7 @@ Actions diretamente — fica em `lib/domain/*`, testável isoladamente e reutili
 | RF10 (Relatórios por categoria/subcategoria)                  | Relatórios               | Queries agregadas (Prisma `groupBy`) + `lib/domain/relatorios.ts`                                                                         |
 | RF11 (Split de despesas do casal)                             | Divisão de despesas      | `lib/domain/split.ts` — calcula saldo a acertar entre Pessoas de um Household                                                             |
 | RF12-RF13 (Investimentos, histórico de patrimônio)            | Investimentos/Patrimônio | CRUD + `lib/domain/patrimonio.ts` para série histórica                                                                                    |
-| RF14 (Rendimento real vs. esperado vs. CDI, projeção)         | Investimentos            | `lib/domain/rendimento.ts` — cálculo de juros compostos e comparação com índice (CDI inicialmente input manual, conforme ponto em aberto) |
+| RF14 (Rendimento real vs. esperado vs. CDI, projeção)         | Investimentos            | `lib/domain/rendimento.ts` (cálculo puro) + `lib/domain/cdi.ts` (busca e cacheia o CDI mensal via API do BCB, série SGS 4391) |
 | RF15 (Liquidez consolidada)                                   | Investimentos            | Query agregada por prazo de resgate sobre `Investimento`                                                                                  |
 | Multiusuário/Household, auditoria (NFR)                       | Transversal              | Auth.js (sessão), `householdId` em todas as entidades, campos `createdBy`/`updatedBy`/timestamps em Lançamento                            |
 
@@ -98,8 +98,6 @@ Household 1───* PosicaoPatrimonio (banco, mes)
 
 ## 6. Pontos em aberto (carregados de REQUISITOS.md §5)
 
-- RF14: fonte do CDI — input manual no MVP; integração com índice externo (ex. API do BCB) fica
-  como evolução, isolada em `lib/domain/rendimento.ts` para trocar a fonte sem afetar o resto.
 - RF06: bancos/formatos prioritários de importação a definir antes de implementar o parser.
 - Multi-moeda: não coberto no MVP; se necessário, adicionar campo `moeda` + tabela de câmbio em
   `Lancamento`.

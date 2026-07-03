@@ -73,7 +73,6 @@ módulo de investimentos e o split de despesas do casal.
 
 ## 5. Pontos em aberto
 
-- Fonte do CDI para RF14: input manual ou integração com índice externo?
 - Importação de extrato (RF06): quais bancos/formatos prioritários?
 - Multi-moeda? (gastos em viagem internacional já aparecem na planilha, ex. IOF/compra
   internacional)
