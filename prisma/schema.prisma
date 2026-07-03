@@ -87,6 +87,8 @@ model Categoria {
   nome                String
   // Percentual do orçamento total sugerido para esta categoria (ex.: 15.50 = 15,5%)
   percentualOrcamento Decimal? @db.Decimal(5, 2)
+  // Inativação lógica — lançamentos antigos podem referenciar, então nunca excluir fisicamente.
+  ativo               Boolean  @default(true)
   householdId         String
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
@@ -103,6 +105,8 @@ model Subcategoria {
   id          String   @id @default(cuid())
   nome        String
   categoriaId String
+  // Inativação lógica — lançamentos antigos podem referenciar, então nunca excluir fisicamente.
+  ativo       Boolean  @default(true)
   householdId String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

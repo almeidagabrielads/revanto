@@ -28,11 +28,13 @@ módulo de investimentos e o split de despesas do casal.
 ## 3. Requisitos Funcionais
 
 ### Cadastros
+
 - RF01 — CRUD de Categorias e Subcategorias (hierarquia 2 níveis), com % de orçamento padrão.
 - RF02 — CRUD de Bancos/meios de pagamento.
 - RF03 — CRUD de Pessoas, com tipo de titularidade (individual, casal, família, outro).
 
 ### Lançamentos
+
 - RF04 — Criar/editar/excluir lançamento com todos os campos do modelo acima.
 - RF05 — Suportar valores negativos (estornos) que compensam lançamentos anteriores.
 - RF06 — Importação de extrato/fatura (CSV/OFX), com sugestão automática de categoria por
@@ -40,6 +42,7 @@ módulo de investimentos e o split de despesas do casal.
 - RF07 — Lançamentos de receita, vinculados a pessoa e subtipo de fonte.
 
 ### Orçamento e acompanhamento
+
 - RF08 — Definir orçamento planejado mensal/anual por categoria/subcategoria, por pessoa e por
   casal/família.
 - RF09 — Cálculo automático de planejado vs. real (mês a mês e acumulado), saldo mensal/anual,
@@ -48,11 +51,13 @@ módulo de investimentos e o split de despesas do casal.
   breakdown mês a mês.
 
 ### Divisão de despesas (casal) — obrigatório
+
 - RF11 — Calcular, a partir de "divisão" (dono do gasto) x "quem pagou", quanto cada pessoa
   pagou em nome da outra/da família, e o saldo final a acertar entre as duas — equivalente ao
   bloco "Controle de pagamento" hoje na aba Isa.
 
 ### Investimentos/Patrimônio — incluído no escopo
+
 - RF12 — CRUD de Investimentos: banco, tipo, produto, valor, vencimento/liquidez, observação,
   titular.
 - RF13 — Histórico mensal de posição de patrimônio por banco/titular.
@@ -61,11 +66,13 @@ módulo de investimentos e o split de despesas do casal.
 - RF15 — Visão de liquidez consolidada (total disponível por prazo de resgate).
 
 ## 4. Requisitos não-funcionais (a validar)
+
 - Multiusuário com pelo menos 2 perfis (Isa, Gabi) e visão consolidada do casal.
 - Histórico auditável de lançamentos (quem criou/editou, quando).
 - Valores monetários em BRL, com tratamento correto de centavos/arredondamento.
 
 ## 5. Pontos em aberto
+
 - Fonte do CDI para RF14: input manual ou integração com índice externo?
 - Importação de extrato (RF06): quais bancos/formatos prioritários?
 - Multi-moeda? (gastos em viagem internacional já aparecem na planilha, ex. IOF/compra

@@ -5,14 +5,14 @@ Decisão de stack e desenho de alto nível para substituir a planilha descrita e
 
 ## 1. Stack escolhida
 
-| Camada         | Escolha                                              |
-|----------------|-------------------------------------------------------|
-| Frontend       | Next.js (React, App Router) + Tailwind CSS            |
+| Camada         | Escolha                                                 |
+| -------------- | ------------------------------------------------------- |
+| Frontend       | Next.js (React, App Router) + Tailwind CSS              |
 | Backend        | Next.js Server Actions / Route Handlers (mesmo projeto) |
-| ORM            | Prisma                                                 |
-| Banco de dados | PostgreSQL gerenciado (Neon ou Supabase, free tier)    |
-| Autenticação   | Auth.js (NextAuth) — credenciais ou magic link         |
-| Hospedagem     | Vercel (frontend + backend) + Neon/Supabase (banco)    |
+| ORM            | Prisma                                                  |
+| Banco de dados | PostgreSQL gerenciado (Neon ou Supabase, free tier)     |
+| Autenticação   | Auth.js (NextAuth) — credenciais ou magic link          |
+| Hospedagem     | Vercel (frontend + backend) + Neon/Supabase (banco)     |
 
 ### Por que essa stack
 
@@ -65,19 +65,19 @@ Actions diretamente — fica em `lib/domain/*`, testável isoladamente e reutili
 
 ## 4. Mapeamento dos módulos de REQUISITOS.md para a arquitetura
 
-| Requisitos                          | Módulo                          | Onde vive |
-|--------------------------------------|----------------------------------|-----------|
-| RF01-RF03 (Cadastros: Categoria, Subcategoria, Banco, Pessoa) | Cadastros | CRUD simples via Prisma, telas de admin |
-| RF04-RF05 (Lançamentos, estornos)    | Lançamentos                     | Server Actions + `lib/domain/lancamentos.ts` |
-| RF06 (Importação CSV/OFX + sugestão de categoria) | Importação | Route Handler de upload + `lib/domain/import/` (parser + matcher por histórico) |
-| RF07 (Receitas)                      | Lançamentos (receita)           | Mesma tabela de lançamento, `tipo = receita`, ou tabela própria `Receita` |
-| RF08-RF09 (Orçamento planejado x real) | Orçamento                      | `lib/domain/orcamento.ts` — agregações planejado vs. real |
-| RF10 (Relatórios por categoria/subcategoria) | Relatórios                  | Queries agregadas (Prisma `groupBy`) + `lib/domain/relatorios.ts` |
-| RF11 (Split de despesas do casal)    | Divisão de despesas              | `lib/domain/split.ts` — calcula saldo a acertar entre Pessoas de um Household |
-| RF12-RF13 (Investimentos, histórico de patrimônio) | Investimentos/Patrimônio | CRUD + `lib/domain/patrimonio.ts` para série histórica |
-| RF14 (Rendimento real vs. esperado vs. CDI, projeção) | Investimentos | `lib/domain/rendimento.ts` — cálculo de juros compostos e comparação com índice (CDI inicialmente input manual, conforme ponto em aberto) |
-| RF15 (Liquidez consolidada)          | Investimentos                   | Query agregada por prazo de resgate sobre `Investimento` |
-| Multiusuário/Household, auditoria (NFR) | Transversal                  | Auth.js (sessão), `householdId` em todas as entidades, campos `createdBy`/`updatedBy`/timestamps em Lançamento |
+| Requisitos                                                    | Módulo                   | Onde vive                                                                                                                                 |
+| ------------------------------------------------------------- | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| RF01-RF03 (Cadastros: Categoria, Subcategoria, Banco, Pessoa) | Cadastros                | CRUD simples via Prisma, telas de admin                                                                                                   |
+| RF04-RF05 (Lançamentos, estornos)                             | Lançamentos              | Server Actions + `lib/domain/lancamentos.ts`                                                                                              |
+| RF06 (Importação CSV/OFX + sugestão de categoria)             | Importação               | Route Handler de upload + `lib/domain/import/` (parser + matcher por histórico)                                                           |
+| RF07 (Receitas)                                               | Lançamentos (receita)    | Mesma tabela de lançamento, `tipo = receita`, ou tabela própria `Receita`                                                                 |
+| RF08-RF09 (Orçamento planejado x real)                        | Orçamento                | `lib/domain/orcamento.ts` — agregações planejado vs. real                                                                                 |
+| RF10 (Relatórios por categoria/subcategoria)                  | Relatórios               | Queries agregadas (Prisma `groupBy`) + `lib/domain/relatorios.ts`                                                                         |
+| RF11 (Split de despesas do casal)                             | Divisão de despesas      | `lib/domain/split.ts` — calcula saldo a acertar entre Pessoas de um Household                                                             |
+| RF12-RF13 (Investimentos, histórico de patrimônio)            | Investimentos/Patrimônio | CRUD + `lib/domain/patrimonio.ts` para série histórica                                                                                    |
+| RF14 (Rendimento real vs. esperado vs. CDI, projeção)         | Investimentos            | `lib/domain/rendimento.ts` — cálculo de juros compostos e comparação com índice (CDI inicialmente input manual, conforme ponto em aberto) |
+| RF15 (Liquidez consolidada)                                   | Investimentos            | Query agregada por prazo de resgate sobre `Investimento`                                                                                  |
+| Multiusuário/Household, auditoria (NFR)                       | Transversal              | Auth.js (sessão), `householdId` em todas as entidades, campos `createdBy`/`updatedBy`/timestamps em Lançamento                            |
 
 ## 5. Modelo de dados (alto nível)
 

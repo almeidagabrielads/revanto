@@ -6,16 +6,16 @@ Controle financeiro do casal (Isa & Gabi). Substitui planilha Numbers. Ver [docs
 
 ## Stack
 
-| Camada     | Tecnologia                                      |
-|------------|-------------------------------------------------|
-| Framework  | Next.js 16 (App Router, TypeScript)             |
-| Estilo     | Tailwind CSS v4                                 |
-| ORM        | Prisma 7 + PostgreSQL (Neon/Supabase)           |
-| Authn      | Auth.js (NextAuth)                              |
-| Validação  | Zod                                             |
-| Testes     | Vitest + Testing Library                        |
-| Lint/fmt   | ESLint (eslint-config-next) + Prettier          |
-| Hospedagem | Vercel + Neon/Supabase                          |
+| Camada     | Tecnologia                             |
+| ---------- | -------------------------------------- |
+| Framework  | Next.js 16 (App Router, TypeScript)    |
+| Estilo     | Tailwind CSS v4                        |
+| ORM        | Prisma 7 + PostgreSQL (Neon/Supabase)  |
+| Authn      | Auth.js (NextAuth)                     |
+| Validação  | Zod                                    |
+| Testes     | Vitest + Testing Library               |
+| Lint/fmt   | ESLint (eslint-config-next) + Prettier |
+| Hospedagem | Vercel + Neon/Supabase                 |
 
 ## Variáveis de ambiente
 
@@ -64,21 +64,22 @@ docs/
 
 ## Scripts
 
-| Comando            | O que faz                                 |
-|--------------------|-------------------------------------------|
-| `npm run dev`      | Dev server em http://localhost:3000       |
-| `npm run build`    | Build de produção                         |
-| `npm run lint`     | ESLint em todo o projeto                  |
-| `npm run format`   | Prettier (reescreve arquivos)             |
-| `npm run format:check` | Prettier (só valida, não reescreve)   |
-| `npm test`         | Vitest (one-shot, CI)                     |
-| `npm run test:watch` | Vitest em modo watch                    |
-| `npx prisma migrate dev` | Aplica migrations ao banco dev      |
-| `npx prisma studio`| GUI do banco em http://localhost:5555     |
+| Comando                  | O que faz                             |
+| ------------------------ | ------------------------------------- |
+| `npm run dev`            | Dev server em http://localhost:3000   |
+| `npm run build`          | Build de produção                     |
+| `npm run lint`           | ESLint em todo o projeto              |
+| `npm run format`         | Prettier (reescreve arquivos)         |
+| `npm run format:check`   | Prettier (só valida, não reescreve)   |
+| `npm test`               | Vitest (one-shot, CI)                 |
+| `npm run test:watch`     | Vitest em modo watch                  |
+| `npx prisma migrate dev` | Aplica migrations ao banco dev        |
+| `npx prisma studio`      | GUI do banco em http://localhost:5555 |
 
 ## Padrões de código
 
 ### Geral
+
 - TypeScript strict (`strict: true` no tsconfig).
 - Nenhuma lógica de negócio em componentes React — fica em `src/lib/domain/`.
 - Toda query Prisma obrigatoriamente filtra por `householdId` do usuário autenticado.
@@ -86,22 +87,26 @@ docs/
 - Datas em UTC no banco; conversão para fuso só na UI.
 
 ### Nomenclatura
+
 - Arquivos de componente: `PascalCase.tsx`.
 - Arquivos de módulo/util: `camelCase.ts`.
 - Variáveis/funções: `camelCase`; tipos/interfaces: `PascalCase`.
 - Rotas API: `src/app/api/<recurso>/route.ts`.
 
 ### Testes
+
 - Testes de domínio ficam ao lado do módulo: `src/lib/domain/split.test.ts`.
 - Testes de API ficam ao lado da rota: `src/app/api/health/route.test.ts`.
 - Não mockar o banco em testes de integração — usar banco de teste real com transaction rollback.
 - Rodar `npm test` antes de qualquer PR.
 
 ### Commits
+
 - Mensagens em português.
 - Formato: `<tipo>: <descrição curta>` (ex.: `feat: adiciona CRUD de categorias`).
 - Tipos: `feat`, `fix`, `refactor`, `test`, `chore`, `docs`.
 
 ### PR / Review
+
 - PR pequeno por funcionalidade — sem bundlar features não relacionadas.
 - Lint, format e testes devem passar no CI antes do merge.

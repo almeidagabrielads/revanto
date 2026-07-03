@@ -15,7 +15,7 @@ Pré-requisito: stack ainda não definida. O primeiro prompt resolve isso antes 
 - [x] 2. Setup do projeto (scaffold, lint, CI básico)
 - [x] 3. Modelagem de dados e migrations
 - [x] 4. Autenticação e cadastro de Pessoas
-- [ ] 5. CRUD de Categorias/Subcategorias
+- [x] 5. CRUD de Categorias/Subcategorias
 - [ ] 6. CRUD de Bancos/meios de pagamento
 - [ ] 7. CRUD de Lançamentos (manual)
 - [ ] 8. Importação de extrato/fatura (CSV/OFX)

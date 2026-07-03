@@ -12,7 +12,12 @@ async function criarUsuario(email: string, senha: string) {
   });
   const passwordHash = await hashPassword(senha);
   return prismaTest.user.create({
-    data: { email, nome: "Usuária Teste", passwordHash, householdId: household.id },
+    data: {
+      email,
+      nome: "Usuária Teste",
+      passwordHash,
+      householdId: household.id,
+    },
   });
 }
 
