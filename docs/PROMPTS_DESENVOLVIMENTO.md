@@ -17,7 +17,7 @@ Pré-requisito: stack ainda não definida. O primeiro prompt resolve isso antes 
 - [x] 4. Autenticação e cadastro de Pessoas
 - [x] 5. CRUD de Categorias/Subcategorias
 - [x] 6. CRUD de Bancos/meios de pagamento
-- [ ] 7. CRUD de Lançamentos (manual)
+- [x] 7. CRUD de Lançamentos (manual)
 - [ ] 8. Importação de extrato/fatura (CSV/OFX)
 - [ ] 9. Orçamento planejado (cadastro por pessoa/categoria/mês)
 - [ ] 10. Cálculo planejado vs. real + dashboards de categoria/subcategoria
