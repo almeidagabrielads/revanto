@@ -20,7 +20,7 @@ Pré-requisito: stack ainda não definida. O primeiro prompt resolve isso antes 
 - [x] 7. CRUD de Lançamentos (manual)
 - [x] 8. Importação de extrato/fatura (CSV/OFX)
 - [x] 9. Orçamento planejado (cadastro por pessoa/categoria/mês)
-- [ ] 10. Cálculo planejado vs. real + dashboards de categoria/subcategoria
+- [x] 10. Cálculo planejado vs. real + dashboards de categoria/subcategoria
 - [ ] 11. Divisão de despesas do casal (split e saldo a acertar)
 - [ ] 12. Módulo de Investimentos (CRUD + posição atual)
 - [ ] 13. Histórico de patrimônio e rendimento (real vs. esperado vs. CDI)

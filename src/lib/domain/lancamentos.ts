@@ -116,6 +116,15 @@ export function listarLancamentos(
   });
 }
 
+// Valor efetivamente gasto de um lançamento — desconto reduz o valor pago
+// (usado em relatórios/orçamento; não altera o valor armazenado).
+export function valorLiquidoCentavos(lancamento: {
+  valorCentavos: number;
+  descontoCentavos: number;
+}): number {
+  return lancamento.valorCentavos - lancamento.descontoCentavos;
+}
+
 export function buscarLancamento(
   prisma: PrismaClient,
   householdId: string,
