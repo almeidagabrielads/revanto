@@ -165,6 +165,9 @@ model Lancamento {
   // Pessoa que efetivamente desembolsou o valor (RF11: quem pagou)
   pessoaPagouId    String
   householdId      String
+  // Hash determinístico de data+descrição+valor+banco — usado para evitar
+  // duplicar lançamentos já importados de extrato/fatura (RF06).
+  hashImportacao   String?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
   createdByUserId  String?
@@ -177,6 +180,7 @@ model Lancamento {
   pessoaDivisao Pessoa       @relation("LancamentoDivisao", fields: [pessoaDivisaoId], references: [id])
   pessoaPagou  Pessoa        @relation("LancamentoPagou", fields: [pessoaPagouId], references: [id])
 
+  @@unique([householdId, hashImportacao])
   @@index([householdId, data])
   @@index([householdId, categoriaId])
   @@index([householdId, pessoaDivisaoId])

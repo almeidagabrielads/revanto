@@ -18,7 +18,7 @@ Pré-requisito: stack ainda não definida. O primeiro prompt resolve isso antes 
 - [x] 5. CRUD de Categorias/Subcategorias
 - [x] 6. CRUD de Bancos/meios de pagamento
 - [x] 7. CRUD de Lançamentos (manual)
-- [ ] 8. Importação de extrato/fatura (CSV/OFX)
+- [x] 8. Importação de extrato/fatura (CSV/OFX)
 - [ ] 9. Orçamento planejado (cadastro por pessoa/categoria/mês)
 - [ ] 10. Cálculo planejado vs. real + dashboards de categoria/subcategoria
 - [ ] 11. Divisão de despesas do casal (split e saldo a acertar)
