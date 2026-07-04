@@ -25,7 +25,7 @@ Pré-requisito: stack ainda não definida. O primeiro prompt resolve isso antes 
 - [x] 12. Módulo de Investimentos (CRUD + posição atual)
 - [x] 13. Histórico de patrimônio e rendimento (real vs. esperado vs. CDI)
 - [x] 14. Relatórios anuais consolidados (equivalente às abas Sum)
-- [ ] 15. Importação dos dados históricos da planilha (migração única)
+- [x] 15. Importação dos dados históricos da planilha (migração única)
 - [ ] 16. Testes end-to-end dos fluxos críticos
 - [ ] 17. Hardening de segurança (auth, dados financeiros sensíveis)
 - [ ] 18. Deploy em produção
