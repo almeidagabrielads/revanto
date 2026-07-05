@@ -195,37 +195,43 @@ export function OrcamentoClient() {
   }
 
   return (
-    <div className="flex flex-col gap-lg">
+    <div className="gap-lg flex flex-col">
       {erro && (
-        <p className="rounded-lg border border-danger/30 bg-danger-container p-sm text-sm text-on-danger-container">
+        <p className="border-danger/30 bg-danger-container p-sm text-on-danger-container rounded-lg border text-sm">
           {erro}
         </p>
       )}
 
-      <div className="flex flex-wrap items-end gap-md">
+      <div className="gap-md flex flex-wrap items-end">
         <div className="flex flex-col gap-1">
-          <label className="text-xs font-semibold text-on-surface-variant" htmlFor="ano">
+          <label
+            className="text-on-surface-variant text-xs font-semibold"
+            htmlFor="ano"
+          >
             Ano
           </label>
           <input
             id="ano"
             type="number"
-            className="w-24 rounded-lg border border-outline-variant bg-surface-container-lowest px-2 py-1"
+            className="border-outline-variant bg-surface-container-lowest w-24 rounded-lg border px-2 py-1"
             value={ano}
             onChange={(e) => setAno(Number(e.target.value))}
           />
         </div>
         <div className="flex flex-col gap-1">
-          <label className="text-xs font-semibold text-on-surface-variant" htmlFor="pessoa">
+          <label
+            className="text-on-surface-variant text-xs font-semibold"
+            htmlFor="pessoa"
+          >
             Pessoa/grupo
           </label>
           <select
             id="pessoa"
-            className="rounded-lg border border-outline-variant bg-surface-container-lowest px-2 py-1"
+            className="border-outline-variant bg-surface-container-lowest rounded-lg border px-2 py-1"
             value={pessoaFiltro}
             onChange={(e) => setPessoaFiltro(e.target.value)}
           >
-            <option value={GRUPO_FAMILIA}>Casal/Família</option>
+            <option value={GRUPO_FAMILIA}>Compartilhado (casa toda)</option>
             {pessoas.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.nome}
@@ -235,11 +241,11 @@ export function OrcamentoClient() {
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-outline-variant bg-surface-container-lowest">
+      <div className="border-outline-variant bg-surface-container-lowest overflow-x-auto rounded-xl border">
         <table className="min-w-full border-collapse text-sm">
           <thead>
-            <tr className="border-b border-outline-variant text-xs font-semibold uppercase tracking-wide text-on-surface-variant">
-              <th className="sticky left-0 bg-surface-container-lowest p-2 text-left">
+            <tr className="border-outline-variant text-on-surface-variant border-b text-xs font-semibold tracking-wide uppercase">
+              <th className="bg-surface-container-lowest sticky left-0 p-2 text-left">
                 Categoria / Subcategoria
               </th>
               {MESES.map((m) => (
@@ -278,7 +284,7 @@ export function OrcamentoClient() {
       </div>
 
       {categorias?.length === 0 && (
-        <p className="text-sm text-on-surface-variant">
+        <p className="text-on-surface-variant text-sm">
           Nenhuma categoria cadastrada — crie categorias antes de definir o
           orçamento.
         </p>
@@ -309,7 +315,7 @@ function LinhaOrcamento({
 }) {
   return (
     <tr
-      className={`border-b border-outline-variant/60 ${
+      className={`border-outline-variant/60 border-b ${
         destaque ? "bg-surface-container-low font-medium" : ""
       }`}
     >
@@ -336,7 +342,7 @@ function LinhaOrcamento({
               key={
                 item?.id ?? `${chave(categoriaId, subcategoriaId, mes)}-vazio`
               }
-              className="w-24 rounded-lg border border-outline-variant bg-surface-container-lowest px-1.5 py-1 text-right"
+              className="border-outline-variant bg-surface-container-lowest w-24 rounded-lg border px-1.5 py-1 text-right"
               onBlur={(e) =>
                 onSalvar(categoriaId, subcategoriaId, mes, e.target.value)
               }
@@ -360,7 +366,7 @@ function LinhaOrcamento({
             mapaOrcamentos.get(chave(categoriaId, subcategoriaId, null))?.id ??
             `${chave(categoriaId, subcategoriaId, null)}-vazio`
           }
-          className="w-24 rounded-lg border border-outline-variant bg-surface-container-lowest px-1.5 py-1 text-right font-medium"
+          className="border-outline-variant bg-surface-container-lowest w-24 rounded-lg border px-1.5 py-1 text-right font-medium"
           onBlur={(e) =>
             onSalvar(categoriaId, subcategoriaId, null, e.target.value)
           }

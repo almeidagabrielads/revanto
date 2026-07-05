@@ -1,12 +1,9 @@
 import Link from "next/link";
 import { DashboardClient } from "./DashboardClient";
-import { PeriodoTabs } from "./PeriodoTabs";
 
 export default function Home() {
   return (
     <main className="flex w-full flex-col">
-      <PeriodoTabs />
-
       <div className="gap-lg p-lg mx-auto flex w-full max-w-6xl flex-col">
         <DashboardClient />
       </div>

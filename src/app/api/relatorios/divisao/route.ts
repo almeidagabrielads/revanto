@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifySession } from "@/lib/auth/dal";
-import { buscarSaldoDivisao } from "@/lib/domain/split";
+import { buscarSaldoDivisaoGrupo } from "@/lib/domain/split";
 
 function parseData(valor: string | null): Date | undefined {
   if (!valor) return undefined;
@@ -16,20 +16,12 @@ export async function GET(request: NextRequest) {
   }
 
   const params = request.nextUrl.searchParams;
-  const saldo = await buscarSaldoDivisao(prisma, session.householdId, {
+  const saldo = await buscarSaldoDivisaoGrupo(prisma, session.householdId, {
     dataInicio: parseData(params.get("dataInicio")),
     dataFim: parseData(params.get("dataFim")),
   });
 
-  if (!saldo) {
-    return NextResponse.json(
-      {
-        error:
-          "É preciso cadastrar duas pessoas do tipo Individual (ex.: Isa e Gabi) para calcular a divisão de despesas.",
-      },
-      { status: 422 },
-    );
-  }
-
+  // null é um estado válido (ex.: casa com apenas uma pessoa cadastrada, ou
+  // nenhuma pessoa do tipo Individual ainda) — não é um erro de configuração.
   return NextResponse.json(saldo);
 }

@@ -1,478 +1,127 @@
 "use client";
 
-import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { DashboardMensal } from "./DashboardMensal";
+import { DashboardAnual } from "./DashboardAnual";
 
-type SaldoMensal = {
-  mes: number;
-  receitaCentavos: number;
-  despesaCentavos: number;
-  saldoCentavos: number;
-};
+const NOMES_MES = [
+  "Janeiro",
+  "Fevereiro",
+  "Março",
+  "Abril",
+  "Maio",
+  "Junho",
+  "Julho",
+  "Agosto",
+  "Setembro",
+  "Outubro",
+  "Novembro",
+  "Dezembro",
+];
 
-type SaldoAnual = {
-  ano: number;
-  receitaCentavos: number;
-  despesaCentavos: number;
-  saldoCentavos: number;
-  porMes: SaldoMensal[];
-};
-
-type SaldoDivisao = {
-  pessoaAId: string;
-  pessoaBId: string;
-  pessoaDevedoraId: string | null;
-  valorDevidoCentavos: number;
-};
-
-type LiquidezFaixa = {
-  faixa: string;
-  totalCentavos: number;
-};
-
-type PosicaoPatrimonio = {
-  mes: string;
-  valorCentavos: number;
-};
-
-type MesPlanejadoVsReal = {
-  mes: number;
-  planejadoCentavos: number;
-  realCentavos: number;
-};
-
-type PlanejadoVsRealCategoria = {
-  categoriaId: string;
-  meses: MesPlanejadoVsReal[];
-};
-
-type Lancamento = {
-  id: string;
-  data: string;
-  descricaoOrigem: string | null;
-  descricaoPropria: string | null;
-  valorCentavos: number;
-  pessoaDivisaoId: string;
-  pessoaPagouId: string;
-};
-
-type Pessoa = { id: string; nome: string };
-type Categoria = { id: string; nome: string };
-
-function centavosParaReais(valor: number): string {
-  return (valor / 100).toLocaleString("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-  });
-}
-
-function primeiroEUltimoDiaDoMes(): { inicio: string; fim: string } {
-  const hoje = new Date();
-  const ano = hoje.getUTCFullYear();
-  const mes = hoje.getUTCMonth();
-  const inicio = new Date(Date.UTC(ano, mes, 1)).toISOString().slice(0, 10);
-  const fim = new Date(Date.UTC(ano, mes + 1, 0)).toISOString().slice(0, 10);
-  return { inicio, fim };
-}
-
-function agruparPatrimonioPorMes(posicoes: PosicaoPatrimonio[]): {
-  atual: number;
-  anterior: number | null;
-} {
-  const totaisPorMes = new Map<string, number>();
-  for (const posicao of posicoes) {
-    const chave = posicao.mes.slice(0, 7);
-    totaisPorMes.set(
-      chave,
-      (totaisPorMes.get(chave) ?? 0) + posicao.valorCentavos,
-    );
-  }
-  const chavesOrdenadas = [...totaisPorMes.keys()].sort();
-  const chaveAtual = chavesOrdenadas.at(-1);
-  const chaveAnterior = chavesOrdenadas.at(-2);
-  return {
-    atual: chaveAtual ? (totaisPorMes.get(chaveAtual) ?? 0) : 0,
-    anterior: chaveAnterior ? (totaisPorMes.get(chaveAnterior) ?? 0) : null,
-  };
-}
+type Modo = "mensal" | "anual";
 
 export function DashboardClient() {
-  const anoAtual = new Date().getUTCFullYear();
-  const mesAtual = new Date().getUTCMonth() + 1;
+  const hoje = new Date();
+  const [modo, setModo] = useState<Modo>("mensal");
+  const [ano, setAno] = useState(hoje.getUTCFullYear());
+  const [mes, setMes] = useState(hoje.getUTCMonth() + 1);
 
-  const [saldo, setSaldo] = useState<SaldoAnual | null>(null);
-  const [divisao, setDivisao] = useState<SaldoDivisao | null>(null);
-  const [divisaoIndisponivel, setDivisaoIndisponivel] = useState(false);
-  const [liquidez, setLiquidez] = useState<LiquidezFaixa[] | null>(null);
-  const [patrimonio, setPatrimonio] = useState<PosicaoPatrimonio[] | null>(
-    null,
-  );
-  const [orcamento, setOrcamento] = useState<PlanejadoVsRealCategoria[] | null>(
-    null,
-  );
-  const [lancamentos, setLancamentos] = useState<Lancamento[] | null>(null);
-  const [pessoas, setPessoas] = useState<Pessoa[]>([]);
-  const [categorias, setCategorias] = useState<Categoria[]>([]);
-  const [naoAutenticado, setNaoAutenticado] = useState(false);
-  const [erro, setErro] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelado = false;
-    const { inicio, fim } = primeiroEUltimoDiaDoMes();
-
-    Promise.all([
-      fetch(`/api/relatorios/saldo?ano=${anoAtual}`),
-      fetch(`/api/relatorios/divisao?dataInicio=${inicio}&dataFim=${fim}`),
-      fetch("/api/investimentos/liquidez"),
-      fetch(`/api/patrimonio?ano=${anoAtual}`),
-      fetch(`/api/relatorios/planejado-vs-real?ano=${anoAtual}`),
-      fetch(`/api/lancamentos?dataInicio=${inicio}&dataFim=${fim}`),
-      fetch("/api/pessoas"),
-      fetch("/api/categorias"),
-    ])
-      .then(async (responses) => {
-        if (cancelado) return;
-        const [
-          saldoRes,
-          divisaoRes,
-          liquidezRes,
-          patrimonioRes,
-          orcamentoRes,
-          lancamentosRes,
-          pessoasRes,
-          categoriasRes,
-        ] = responses;
-
-        if (
-          saldoRes.status === 401 ||
-          liquidezRes.status === 401 ||
-          patrimonioRes.status === 401 ||
-          orcamentoRes.status === 401 ||
-          lancamentosRes.status === 401 ||
-          pessoasRes.status === 401 ||
-          categoriasRes.status === 401
-        ) {
-          setNaoAutenticado(true);
-          return;
-        }
-
-        setSaldo(saldoRes.ok ? await saldoRes.json() : null);
-        setLiquidez(liquidezRes.ok ? await liquidezRes.json() : []);
-        setPatrimonio(patrimonioRes.ok ? await patrimonioRes.json() : []);
-        setOrcamento(orcamentoRes.ok ? await orcamentoRes.json() : []);
-        setLancamentos(lancamentosRes.ok ? await lancamentosRes.json() : []);
-        setPessoas(pessoasRes.ok ? await pessoasRes.json() : []);
-        setCategorias(categoriasRes.ok ? await categoriasRes.json() : []);
-
-        if (divisaoRes.status === 422) {
-          setDivisaoIndisponivel(true);
-        } else if (divisaoRes.ok) {
-          setDivisao(await divisaoRes.json());
-        }
-      })
-      .catch(() => {
-        if (!cancelado) setErro("Não foi possível carregar a visão geral.");
-      });
-
-    return () => {
-      cancelado = true;
-    };
-  }, [anoAtual]);
-
-  if (naoAutenticado) {
-    return (
-      <p className="text-on-surface-variant">
-        Não autenticado —{" "}
-        <Link
-          href="/login"
-          className="text-primary font-medium hover:underline"
-        >
-          faça login
-        </Link>{" "}
-        para ver a visão geral.
-      </p>
-    );
+  function irParaMesAnterior() {
+    if (mes === 1) {
+      setMes(12);
+      setAno((a) => a - 1);
+    } else {
+      setMes((m) => m - 1);
+    }
   }
 
-  const nomePessoa = (id: string) =>
-    pessoas.find((p) => p.id === id)?.nome ?? "—";
-  const nomeCategoria = (id: string | null) =>
-    categorias.find((c) => c.id === id)?.nome ?? "Sem categoria";
+  function irParaProximoMes() {
+    if (mes === 12) {
+      setMes(1);
+      setAno((a) => a + 1);
+    } else {
+      setMes((m) => m + 1);
+    }
+  }
 
-  const saldoDoMes = saldo?.porMes.find((m) => m.mes === mesAtual) ?? null;
-  const investimentosCentavos = (liquidez ?? []).reduce(
-    (soma, f) => soma + f.totalCentavos,
-    0,
-  );
-  const {
-    atual: patrimonioAtualCentavos,
-    anterior: patrimonioAnteriorCentavos,
-  } = agruparPatrimonioPorMes(patrimonio ?? []);
-  const ativosLiquidosCentavos =
-    patrimonioAtualCentavos - investimentosCentavos;
-  const variacaoPercentual =
-    patrimonioAnteriorCentavos && patrimonioAnteriorCentavos !== 0
-      ? ((patrimonioAtualCentavos - patrimonioAnteriorCentavos) /
-          Math.abs(patrimonioAnteriorCentavos)) *
-        100
-      : null;
+  const botaoToggleClass = (ativo: boolean) =>
+    `rounded-full px-md py-1.5 text-sm font-semibold transition-colors ${
+      ativo
+        ? "bg-primary text-on-primary"
+        : "text-on-surface-variant hover:text-on-surface"
+    }`;
 
-  const categoriasOrcamento = (orcamento ?? [])
-    .map((c) => ({
-      categoriaId: c.categoriaId,
-      ...(c.meses.find((m) => m.mes === mesAtual) ?? {
-        planejadoCentavos: 0,
-        realCentavos: 0,
-      }),
-    }))
-    .filter((c) => c.planejadoCentavos > 0 || c.realCentavos > 0);
-  const totalPlanejadoCentavos = categoriasOrcamento.reduce(
-    (soma, c) => soma + c.planejadoCentavos,
-    0,
-  );
-  const totalRealCentavos = categoriasOrcamento.reduce(
-    (soma, c) => soma + c.realCentavos,
-    0,
-  );
-
-  const transacoesRecentes = (lancamentos ?? []).slice(0, 5);
-
-  const cardClass =
-    "flex flex-col gap-md rounded-xl border border-outline-variant bg-surface-container-lowest p-lg shadow-sm";
-  const cardTitleClass =
-    "text-xs font-semibold uppercase tracking-wide text-on-surface-variant";
-  const linkClass = "mt-auto text-sm font-medium text-primary hover:underline";
+  const botaoSetaClass =
+    "flex h-8 w-8 items-center justify-center rounded-full border border-outline-variant text-on-surface-variant hover:border-primary hover:text-primary";
 
   return (
     <div className="gap-lg flex flex-col">
-      {erro && (
-        <p className="border-danger/30 bg-danger-container p-sm text-on-danger-container rounded-lg border text-sm">
-          {erro}
-        </p>
-      )}
-
-      <div className="gap-md grid grid-cols-1 lg:grid-cols-3">
-        <div className={`${cardClass} lg:col-span-2`}>
-          <div className="gap-md flex items-start justify-between">
-            <h2 className={cardTitleClass}>Patrimônio consolidado</h2>
-            {variacaoPercentual !== null && (
-              <span
-                className={`px-sm rounded-full py-0.5 text-xs font-semibold ${
-                  variacaoPercentual >= 0
-                    ? "bg-success/15 text-success"
-                    : "bg-danger-container text-on-danger-container"
-                }`}
+      <div className="gap-md flex flex-wrap items-center justify-between">
+        <div className="gap-md flex items-center">
+          <h1 className="text-on-surface text-xl font-bold">
+            {modo === "mensal"
+              ? `${NOMES_MES[mes - 1]} ${ano}`
+              : `Ano de ${ano}`}
+          </h1>
+          {modo === "mensal" ? (
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={irParaMesAnterior}
+                aria-label="Mês anterior"
+                className={botaoSetaClass}
               >
-                {variacaoPercentual >= 0 ? "↗" : "↘"}{" "}
-                {Math.abs(variacaoPercentual).toFixed(1)}% este mês
-              </span>
-            )}
-          </div>
-          <p className="data-tabular text-on-surface text-3xl font-semibold">
-            {centavosParaReais(patrimonioAtualCentavos)}
-          </p>
-          <div className="gap-sm border-outline-variant pt-md grid grid-cols-1 border-t sm:grid-cols-3">
-            <div>
-              <p className="text-on-surface-variant text-xs">Ativos líquidos</p>
-              <p className="data-tabular text-on-surface font-semibold">
-                {centavosParaReais(ativosLiquidosCentavos)}
-              </p>
-            </div>
-            <div>
-              <p className="text-on-surface-variant text-xs">Investimentos</p>
-              <p className="data-tabular text-on-surface font-semibold">
-                {centavosParaReais(investimentosCentavos)}
-              </p>
-            </div>
-            <div>
-              <p className="text-on-surface-variant text-xs">Saldo do mês</p>
-              <p
-                className={`data-tabular font-semibold ${
-                  saldoDoMes && saldoDoMes.saldoCentavos < 0
-                    ? "text-danger"
-                    : "text-on-surface"
-                }`}
+                ‹
+              </button>
+              <button
+                onClick={irParaProximoMes}
+                aria-label="Próximo mês"
+                className={botaoSetaClass}
               >
-                {saldoDoMes ? centavosParaReais(saldoDoMes.saldoCentavos) : "—"}
-              </p>
+                ›
+              </button>
             </div>
-          </div>
+          ) : (
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => setAno((a) => a - 1)}
+                aria-label="Ano anterior"
+                className={botaoSetaClass}
+              >
+                ‹
+              </button>
+              <button
+                onClick={() => setAno((a) => a + 1)}
+                aria-label="Próximo ano"
+                className={botaoSetaClass}
+              >
+                ›
+              </button>
+            </div>
+          )}
         </div>
 
-        <div className="gap-md bg-primary p-lg text-on-primary flex flex-col justify-between rounded-xl shadow-sm">
-          <h2 className="text-on-primary/70 text-center text-xs font-semibold tracking-wide uppercase">
-            Acerto de contas
-          </h2>
-          {divisaoIndisponivel ? (
-            <p className="text-on-primary/90 text-center text-sm">
-              Cadastre duas pessoas do tipo Individual em{" "}
-              <Link href="/pessoas" className="font-semibold underline">
-                Pessoas
-              </Link>{" "}
-              para calcular a divisão.
-            </p>
-          ) : divisao ? (
-            <>
-              <div className="gap-md flex items-center justify-center">
-                <span className="bg-tertiary-container text-on-tertiary-container flex h-11 w-11 items-center justify-center rounded-full text-sm font-bold">
-                  {nomePessoa(divisao.pessoaAId).charAt(0).toUpperCase()}
-                </span>
-                <span className="text-on-primary/60">→</span>
-                <span className="bg-secondary text-on-secondary flex h-11 w-11 items-center justify-center rounded-full text-sm font-bold">
-                  {nomePessoa(divisao.pessoaBId).charAt(0).toUpperCase()}
-                </span>
-              </div>
-              {divisao.pessoaDevedoraId ? (
-                <div className="text-center">
-                  <p className="text-lg font-bold">
-                    {nomePessoa(divisao.pessoaDevedoraId)} deve{" "}
-                    {centavosParaReais(divisao.valorDevidoCentavos)}
-                  </p>
-                  <p className="text-on-primary/70 text-sm">
-                    Para equilibrar os gastos compartilhados
-                  </p>
-                </div>
-              ) : (
-                <p className="text-on-primary/90 text-center text-sm">
-                  Saldo zerado.
-                </p>
-              )}
-            </>
-          ) : (
-            <p className="text-on-primary/80 text-center text-sm">
-              Carregando…
-            </p>
-          )}
-          <Link
-            href="/divisao"
-            className="bg-on-primary/10 px-md py-sm hover:bg-on-primary/20 rounded-xl text-center text-sm font-semibold"
+        <div className="border-outline-variant bg-surface-container-lowest flex items-center gap-1 rounded-full border p-1">
+          <button
+            onClick={() => setModo("mensal")}
+            className={botaoToggleClass(modo === "mensal")}
           >
-            Ver detalhes
-          </Link>
+            Mensal
+          </button>
+          <button
+            onClick={() => setModo("anual")}
+            className={botaoToggleClass(modo === "anual")}
+          >
+            Anual
+          </button>
         </div>
       </div>
 
-      <div className="gap-md grid grid-cols-1 lg:grid-cols-3">
-        <div className={cardClass}>
-          <div className="flex items-center justify-between">
-            <h2 className={cardTitleClass}>Orçamento do mês</h2>
-            <Link
-              href="/orcamento"
-              className="text-primary text-xs font-medium hover:underline"
-            >
-              Ver tudo
-            </Link>
-          </div>
-          {categoriasOrcamento.length > 0 ? (
-            <div className="gap-md flex flex-col">
-              {categoriasOrcamento.map((c) => {
-                const estourou =
-                  c.realCentavos > c.planejadoCentavos &&
-                  c.planejadoCentavos > 0;
-                const percentual =
-                  c.planejadoCentavos > 0
-                    ? Math.min(
-                        (c.realCentavos / c.planejadoCentavos) * 100,
-                        100,
-                      )
-                    : 100;
-                return (
-                  <div key={c.categoriaId} className="flex flex-col gap-1">
-                    <div className="flex items-baseline justify-between text-sm">
-                      <span className="text-on-surface">
-                        {nomeCategoria(c.categoriaId)}
-                      </span>
-                      <span
-                        className={`data-tabular text-xs font-medium ${
-                          estourou ? "text-danger" : "text-on-surface-variant"
-                        }`}
-                      >
-                        {centavosParaReais(c.realCentavos)} /{" "}
-                        {centavosParaReais(c.planejadoCentavos)}
-                      </span>
-                    </div>
-                    <div className="bg-surface-container h-1.5 w-full overflow-hidden rounded-full">
-                      <div
-                        className={`h-full rounded-full ${estourou ? "bg-danger" : "bg-primary"}`}
-                        style={{ width: `${percentual}%` }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <p className="text-on-surface-variant text-sm">
-              Nenhum orçamento planejado para este mês.
-            </p>
-          )}
-          <div className="bg-surface-container-low p-sm mt-auto flex items-center justify-between rounded-lg text-sm">
-            <span className="text-on-surface-variant">
-              Total planejado: {centavosParaReais(totalPlanejadoCentavos)}
-            </span>
-            <span
-              className={`data-tabular font-semibold ${
-                totalPlanejadoCentavos - totalRealCentavos < 0
-                  ? "text-danger"
-                  : "text-on-surface"
-              }`}
-            >
-              Saldo:{" "}
-              {centavosParaReais(totalPlanejadoCentavos - totalRealCentavos)}
-            </span>
-          </div>
-        </div>
-
-        <div className={`${cardClass} lg:col-span-2`}>
-          <div className="flex items-center justify-between">
-            <h2 className={cardTitleClass}>Transações recentes</h2>
-          </div>
-          {transacoesRecentes.length > 0 ? (
-            <div className="divide-outline-variant/60 flex flex-col divide-y">
-              <div className="gap-sm pb-sm text-on-surface-variant grid grid-cols-5 text-xs font-semibold tracking-wide uppercase">
-                <span>Data</span>
-                <span>Descrição</span>
-                <span>Pagador</span>
-                <span>Dono</span>
-                <span className="justify-self-end">Valor</span>
-              </div>
-              {transacoesRecentes.map((l) => (
-                <div
-                  key={l.id}
-                  className="gap-sm py-sm grid grid-cols-5 items-center text-sm"
-                >
-                  <span className="text-on-surface-variant">
-                    {new Date(l.data).toLocaleDateString("pt-BR", {
-                      day: "2-digit",
-                      month: "short",
-                      timeZone: "UTC",
-                    })}
-                  </span>
-                  <span className="text-on-surface truncate">
-                    {l.descricaoPropria || l.descricaoOrigem || "—"}
-                  </span>
-                  <span className="bg-surface-container px-sm text-on-surface-variant justify-self-start rounded-full py-0.5 text-xs font-semibold">
-                    {nomePessoa(l.pessoaPagouId)}
-                  </span>
-                  <span className="bg-surface-container px-sm text-on-surface-variant justify-self-start rounded-full py-0.5 text-xs font-semibold">
-                    {nomePessoa(l.pessoaDivisaoId)}
-                  </span>
-                  <span className="data-tabular text-on-surface justify-self-end font-semibold">
-                    {centavosParaReais(l.valorCentavos)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-on-surface-variant text-sm">
-              Nenhum lançamento neste mês.
-            </p>
-          )}
-          <Link href="/lancamentos" className={linkClass}>
-            Ver extrato completo →
-          </Link>
-        </div>
-      </div>
+      {modo === "mensal" ? (
+        <DashboardMensal ano={ano} mes={mes} />
+      ) : (
+        <DashboardAnual ano={ano} />
+      )}
     </div>
   );
 }

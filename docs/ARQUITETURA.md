@@ -30,12 +30,12 @@ Decisão de stack e desenho de alto nível para substituir a planilha descrita e
 
 ## 2. Multi-tenancy desde o início
 
-Mesmo com escopo inicial de uma única "casa" (Isa + Gabi), o modelo de dados é desenhado em torno
-de **Household** (agregado casal/família) como unidade de isolamento, em vez de assumir 2 usuários
-fixos no código. Isso evita migração de dados/schema caso o produto seja aberto para outros casais
-no futuro.
+O modelo de dados é desenhado em torno de **Household** (agregado de qualquer composição de
+convivência — pessoa morando sozinha, casal, família ou grupo dividindo a casa) como unidade de
+isolamento, em vez de assumir um número fixo de usuários no código. `Pessoa` não tem limite de
+quantidade por household, e o acerto de contas (`RF11`) funciona para N pessoas, não apenas duas.
 
-- `Household`: representa o "tenant" (ex.: "Isa & Gabi").
+- `Household`: representa o "tenant" (ex.: "República da Rua Azul").
 - `User`: pessoa com login, pertence a um `Household`.
 - Todas as entidades de domínio (Pessoa, Lançamento, Orçamento, Investimento, etc.) carregam
   `householdId` e são sempre filtradas por ele nas queries — nenhuma query global sem esse filtro.
@@ -73,7 +73,7 @@ Actions diretamente — fica em `lib/domain/*`, testável isoladamente e reutili
 | RF07 (Receitas)                                               | Lançamentos (receita)    | Mesma tabela de lançamento, `tipo = receita`, ou tabela própria `Receita`                                                                 |
 | RF08-RF09 (Orçamento planejado x real)                        | Orçamento                | `lib/domain/orcamento.ts` — agregações planejado vs. real                                                                                 |
 | RF10 (Relatórios por categoria/subcategoria)                  | Relatórios               | Queries agregadas (Prisma `groupBy`) + `lib/domain/relatorios.ts`                                                                         |
-| RF11 (Split de despesas do casal)                             | Divisão de despesas      | `lib/domain/split.ts` — calcula saldo a acertar entre Pessoas de um Household                                                             |
+| RF11 (Acerto de contas entre as pessoas da casa)               | Divisão de despesas      | `lib/domain/split.ts` — calcula saldo a acertar entre N Pessoas de um Household                                                           |
 | RF12-RF13 (Investimentos, histórico de patrimônio)            | Investimentos/Patrimônio | CRUD + `lib/domain/patrimonio.ts` para série histórica                                                                                    |
 | RF14 (Rendimento real vs. esperado vs. CDI, projeção)         | Investimentos            | `lib/domain/rendimento.ts` (cálculo puro) + `lib/domain/cdi.ts` (busca e cacheia o CDI mensal via API do BCB, série SGS 4391) |
 | RF15 (Liquidez consolidada)                                   | Investimentos            | Query agregada por prazo de resgate sobre `Investimento`                                                                                  |

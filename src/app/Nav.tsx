@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { corPessoa } from "./components/PessoaBadge";
+import { unicosPorId } from "@/lib/dedupe";
 
 type Usuario = { id: string; email: string; nome: string };
 type Pessoa = { id: string; nome: string; tipo: string };
@@ -18,10 +20,7 @@ const LINKS = [
   { href: "/importacao", label: "Importar" },
 ];
 
-const CORES_AVATAR = [
-  "bg-tertiary-container text-on-tertiary-container",
-  "bg-secondary text-on-secondary",
-];
+const MAX_AVATARES = 4;
 
 export function Nav() {
   const router = useRouter();
@@ -51,7 +50,7 @@ export function Nav() {
       .then(async (response) => {
         if (cancelado || !response.ok) return;
         const dados: Pessoa[] = await response.json();
-        setPessoas(dados.filter((p) => p.tipo === "INDIVIDUAL").slice(0, 2));
+        setPessoas(unicosPorId(dados).filter((p) => p.tipo === "INDIVIDUAL"));
       })
       .catch(() => {});
     return () => {
@@ -127,15 +126,23 @@ export function Nav() {
                 </svg>
               </Link>
               <div className="flex items-center -space-x-2">
-                {pessoas.map((p, i) => (
+                {pessoas.slice(0, MAX_AVATARES).map((p) => (
                   <span
                     key={p.id}
                     title={p.nome}
-                    className={`border-surface flex h-8 w-8 items-center justify-center rounded-full border-2 text-xs font-bold ${CORES_AVATAR[i % CORES_AVATAR.length]}`}
+                    className={`border-surface flex h-8 w-8 items-center justify-center rounded-full border-2 text-xs font-bold ${corPessoa(p.id)}`}
                   >
                     {p.nome.charAt(0).toUpperCase()}
                   </span>
                 ))}
+                {pessoas.length > MAX_AVATARES && (
+                  <span
+                    title={`+${pessoas.length - MAX_AVATARES}`}
+                    className="border-surface bg-surface-container text-on-surface-variant flex h-8 w-8 items-center justify-center rounded-full border-2 text-xs font-bold"
+                  >
+                    +{pessoas.length - MAX_AVATARES}
+                  </span>
+                )}
               </div>
               <button
                 onClick={sair}

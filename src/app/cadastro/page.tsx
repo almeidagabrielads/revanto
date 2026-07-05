@@ -24,7 +24,8 @@ export default function CadastroPage() {
         </div>
         <p className="text-on-primary/90 max-w-[28rem] text-base leading-relaxed">
           &ldquo;Onde o planejamento encontra a parceria. Transformamos a gestão
-          financeira em um diálogo leve e transparente para o casal.&rdquo;
+          financeira em um diálogo leve e transparente para quem divide a
+          casa.&rdquo;
         </p>
       </section>
 
@@ -38,7 +39,7 @@ export default function CadastroPage() {
               Comecem agora
             </h2>
             <p className="text-on-surface-variant text-sm">
-              Criem a gestão financeira compartilhada do casal
+              Criem a gestão financeira compartilhada da sua casa
             </p>
           </header>
           <CadastroClient />

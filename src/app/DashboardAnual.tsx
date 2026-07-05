@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { Fragment, useEffect, useMemo, useState } from "react";
+import { unicosPorChave, unicosPorId } from "@/lib/dedupe";
 
 const MESES = [
   "Jan",
@@ -67,11 +68,10 @@ type ResumoCategoria = {
   mediaMensalCentavos: number;
 };
 
-type SaldoDivisao = {
-  pessoaAId: string;
-  pessoaBId: string;
-  pessoaDevedoraId: string | null;
-  valorDevidoCentavos: number;
+type Transferencia = { deId: string; paraId: string; valorCentavos: number };
+type SaldoDivisaoGrupo = {
+  participantes: string[];
+  transferenciasSugeridas: Transferencia[];
 };
 
 type RelatorioAnual = {
@@ -79,7 +79,7 @@ type RelatorioAnual = {
   saldo: SaldoAnual;
   planejadoVsReal: SecaoPlanejadoVsReal[];
   resumoPorCategoria: ResumoCategoria[];
-  divisaoDespesas: SaldoDivisao | null;
+  divisaoDespesas: SaldoDivisaoGrupo | null;
 };
 
 function formatarReais(centavos: number): string {
@@ -135,9 +135,7 @@ function somarItens(secoes: SecaoPlanejadoVsReal[]) {
   return [...consolidado.values()];
 }
 
-export function RelatorioAnualClient() {
-  const anoAtual = new Date().getUTCFullYear();
-  const [ano, setAno] = useState(anoAtual);
+export function DashboardAnual({ ano }: { ano: number }) {
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [pessoas, setPessoas] = useState<Pessoa[]>([]);
   const [relatorio, setRelatorio] = useState<RelatorioAnual | null>(null);
@@ -159,8 +157,13 @@ export function RelatorioAnualClient() {
           setNaoAutenticado(true);
           return;
         }
-        setCategorias(cats);
-        setPessoas(pes);
+        setCategorias(
+          unicosPorId<Categoria>(cats).map((c) => ({
+            ...c,
+            subcategorias: unicosPorId(c.subcategorias),
+          })),
+        );
+        setPessoas(unicosPorId<Pessoa>(pes));
       })
       .catch(() => {
         if (!cancelado)
@@ -191,7 +194,13 @@ export function RelatorioAnualClient() {
           return;
         }
         setErro(null);
-        setRelatorio(body);
+        setRelatorio({
+          ...body,
+          resumoPorCategoria: unicosPorChave(
+            body.resumoPorCategoria,
+            (r: ResumoCategoria) => r.categoriaId,
+          ),
+        });
         setReceitaAnoAnterior(
           saldoAnteriorRes.ok
             ? (await saldoAnteriorRes.json()).receitaCentavos
@@ -335,36 +344,13 @@ export function RelatorioAnualClient() {
         </p>
       )}
 
-      <div className="gap-md flex flex-wrap items-end justify-between">
-        <div>
-          <h1 className="text-on-surface text-2xl font-bold">Visão anual</h1>
-          <p className="text-on-surface-variant text-sm">
-            Resumo financeiro compartilhado de {ano}
-          </p>
-        </div>
-        <div className="gap-md flex items-center">
-          <div className="flex flex-col gap-1">
-            <label
-              className="text-on-surface-variant text-xs font-semibold"
-              htmlFor="ano"
-            >
-              Ano
-            </label>
-            <input
-              id="ano"
-              type="number"
-              className="border-outline-variant bg-surface-container-lowest w-24 rounded-lg border px-2 py-1"
-              value={ano}
-              onChange={(e) => setAno(Number(e.target.value))}
-            />
-          </div>
-          <Link
-            href="/configuracoes/exportar-dados"
-            className="bg-primary px-md py-sm text-on-primary rounded-xl text-sm font-semibold hover:opacity-90"
-          >
-            Exportar dados
-          </Link>
-        </div>
+      <div className="flex justify-end">
+        <Link
+          href="/configuracoes/exportar-dados"
+          className="bg-primary px-md py-sm text-on-primary rounded-xl text-sm font-semibold hover:opacity-90"
+        >
+          Exportar dados
+        </Link>
       </div>
 
       {/* Resumo do ano */}
@@ -660,13 +646,19 @@ export function RelatorioAnualClient() {
                 Sem lançamentos com pessoa vinculada em {ano}.
               </p>
             )}
-            {divisaoDespesas?.pessoaDevedoraId && (
-              <p className="text-on-surface-variant mt-auto text-xs">
-                {nomePessoa.get(divisaoDespesas.pessoaDevedoraId)} deve{" "}
-                {formatarReais(divisaoDespesas.valorDevidoCentavos)} para
-                equilibrar o ano.
-              </p>
-            )}
+            {divisaoDespesas &&
+              divisaoDespesas.transferenciasSugeridas.length > 0 && (
+                <div className="mt-auto flex flex-col gap-0.5">
+                  {divisaoDespesas.transferenciasSugeridas.map((t, i) => (
+                    <p key={i} className="text-on-surface-variant text-xs">
+                      {nomePessoa.get(t.deId) ?? t.deId} deve{" "}
+                      {formatarReais(t.valorCentavos)} para{" "}
+                      {nomePessoa.get(t.paraId) ?? t.paraId} para equilibrar o
+                      ano.
+                    </p>
+                  ))}
+                </div>
+              )}
           </div>
 
           <div className={cardClass}>

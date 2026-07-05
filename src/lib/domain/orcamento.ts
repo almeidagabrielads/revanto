@@ -2,7 +2,7 @@ import * as z from "zod";
 import type { PrismaClient } from "@/generated/prisma/client";
 
 export const CriarOrcamentoSchema = z.object({
-  // null/ausente = orçamento do household (casal/família)
+  // null/ausente = orçamento compartilhado da casa (não de uma pessoa específica)
   pessoaId: z.string().trim().min(1).nullish(),
   categoriaId: z.string().trim().min(1, "Categoria é obrigatória."),
   subcategoriaId: z.string().trim().min(1).nullish(),

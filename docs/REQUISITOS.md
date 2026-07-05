@@ -43,18 +43,20 @@ módulo de investimentos e o split de despesas do casal.
 
 ### Orçamento e acompanhamento
 
-- RF08 — Definir orçamento planejado mensal/anual por categoria/subcategoria, por pessoa e por
-  casal/família.
+- RF08 — Definir orçamento planejado mensal/anual por categoria/subcategoria, por pessoa e
+  compartilhado pela casa toda.
 - RF09 — Cálculo automático de planejado vs. real (mês a mês e acumulado), saldo mensal/anual,
   e indicador de dentro/fora do planejado (%).
 - RF10 — Relatórios agregados por categoria e subcategoria: total, % do total, média mensal,
   breakdown mês a mês.
 
-### Divisão de despesas (casal) — obrigatório
+### Acerto de contas entre as pessoas da casa — obrigatório
 
 - RF11 — Calcular, a partir de "divisão" (dono do gasto) x "quem pagou", quanto cada pessoa
-  pagou em nome da outra/da família, e o saldo final a acertar entre as duas — equivalente ao
-  bloco "Controle de pagamento" hoje na aba Isa.
+  pagou em nome das demais, e o conjunto mínimo de transferências para zerar o saldo entre
+  todas as pessoas do tipo Individual cadastradas — não limitado a duas pessoas, para suportar
+  desde quem mora sozinho até famílias ou repúblicas com vários membros. Equivalente ao bloco
+  "Controle de pagamento" hoje na aba Isa da planilha original.
 
 ### Investimentos/Patrimônio — incluído no escopo
 
@@ -67,7 +69,9 @@ módulo de investimentos e o split de despesas do casal.
 
 ## 4. Requisitos não-funcionais (a validar)
 
-- Multiusuário com pelo menos 2 perfis (Isa, Gabi) e visão consolidada do casal.
+- Multiusuário, com número arbitrário de pessoas por household (uma pessoa morando sozinha, um
+  casal, uma família com vários membros ou um grupo dividindo a casa) e visão consolidada do
+  grupo.
 - Histórico auditável de lançamentos (quem criou/editou, quando).
 - Valores monetários em BRL, com tratamento correto de centavos/arredondamento.
 

@@ -5,7 +5,7 @@ import type { PrismaClient } from "@/generated/prisma/client";
 
 export const CriarPosicaoPatrimonioSchema = z.object({
   bancoId: z.string().trim().min(1, "Banco é obrigatório."),
-  // null/ausente = posição do casal/família, sem titular individual.
+  // null/ausente = posição compartilhada da casa, sem titular individual.
   pessoaId: z.string().trim().min(1).nullish(),
   // Qualquer dia do mês de referência é aceito; normalizado para o dia 1.
   mes: z.coerce.date(),

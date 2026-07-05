@@ -141,7 +141,7 @@ describe("buscarRelatorioAnual", () => {
 
     // Planejado vs. real: uma seção por pessoa individual + uma do casal/família.
     const labels = relatorio.planejadoVsReal.map((s) => s.label).sort();
-    expect(labels).toEqual(["Casal/Família", "Gabi", "Isa"]);
+    expect(labels).toEqual(["Compartilhado", "Gabi", "Isa"]);
 
     // A seção "Família" reflete o orçamento do casal (pessoaId nulo), mas o
     // real considera todos os lançamentos do household no período — mesma
@@ -190,8 +190,9 @@ describe("buscarRelatorioAnual", () => {
     // Divisão de despesas: gasto do casal de 200_000, Isa pagou -> deve 100_000 a menos
     // (Gabi deve 100_000 para Isa).
     expect(relatorio.divisaoDespesas).not.toBeNull();
-    expect(relatorio.divisaoDespesas!.valorDevidoCentavos).toBe(100_000);
-    expect(relatorio.divisaoDespesas!.pessoaDevedoraId).toBe(gabi.id);
+    expect(relatorio.divisaoDespesas!.transferenciasSugeridas).toEqual([
+      { deId: gabi.id, paraId: isa.id, valorCentavos: 100_000 },
+    ]);
   });
 
   it("omite a divisão de despesas quando o household não tem duas pessoas individuais", async () => {
@@ -211,7 +212,7 @@ describe("buscarRelatorioAnual", () => {
     expect(relatorio.evolucaoPatrimonio).toEqual([]);
     expect(relatorio.planejadoVsReal.map((s) => s.label)).toEqual([
       "Isa",
-      "Casal/Família",
+      "Compartilhado",
     ]);
   });
 });

@@ -9,8 +9,8 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Isa & Gabi",
-  description: "Controle financeiro do casal",
+  title: "FINANCO",
+  description: "Gestão financeira compartilhada",
 };
 
 export default function RootLayout({
@@ -21,7 +21,7 @@ export default function RootLayout({
   return (
     <html lang="pt-BR" className={`${inter.variable} h-full antialiased`}>
       <body
-        className="flex min-h-full flex-col bg-background font-sans text-on-surface"
+        className="bg-background text-on-surface flex min-h-full flex-col font-sans"
         suppressHydrationWarning
       >
         <Nav />

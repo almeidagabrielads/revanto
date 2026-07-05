@@ -24,7 +24,8 @@ export default function LoginPage() {
         </div>
         <p className="text-on-primary/90 max-w-[28rem] text-base leading-relaxed">
           &ldquo;Onde o planejamento encontra a parceria. Transformamos a gestão
-          financeira em um diálogo leve e transparente para o casal.&rdquo;
+          financeira em um diálogo leve e transparente para quem divide a
+          casa.&rdquo;
         </p>
       </section>
 

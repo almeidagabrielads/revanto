@@ -2,7 +2,7 @@
 
 # Finance Manager — CLAUDE.md
 
-Controle financeiro do casal (Isa & Gabi). Substitui planilha Numbers. Ver [docs/ARQUITETURA.md](docs/ARQUITETURA.md) e [docs/REQUISITOS.md](docs/REQUISITOS.md).
+Gestão financeira compartilhada, configurável para qualquer composição de convivência (pessoa morando sozinha, casal, família ou república dividindo a casa). Substitui planilha Numbers. Ver [docs/ARQUITETURA.md](docs/ARQUITETURA.md) e [docs/REQUISITOS.md](docs/REQUISITOS.md).
 
 ## Stack
 

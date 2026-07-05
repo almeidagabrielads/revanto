@@ -54,7 +54,7 @@ export function CadastroClient() {
         <input
           id="household"
           type="text"
-          placeholder="Ex.: Casa da Isa & Gabi"
+          placeholder="Ex.: República da Rua Azul"
           className={inputClass}
           value={household}
           onChange={(e) => setHousehold(e.target.value)}

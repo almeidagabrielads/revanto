@@ -9,7 +9,7 @@ import {
   type ResumoSubcategoria,
   type SaldoAnual,
 } from "./relatorios";
-import { buscarSaldoDivisao, type SaldoDivisao } from "./split";
+import { buscarSaldoDivisaoGrupo, type SaldoDivisaoGrupo } from "./split";
 
 // ─── Relatório anual consolidado ───────────────────────────────────────────────
 //
@@ -52,7 +52,7 @@ export function calcularEvolucaoPatrimonio(
 }
 
 export type SecaoPlanejadoVsReal = {
-  // null = orçamento do casal/família (sem pessoa específica).
+  // null = orçamento compartilhado pela casa (sem pessoa específica).
   pessoaId: string | null;
   label: string;
   itens: PlanejadoVsRealCategoria[];
@@ -65,7 +65,7 @@ export type RelatorioAnual = {
   resumoPorCategoria: ResumoCategoria[];
   resumoPorSubcategoria: ResumoSubcategoria[];
   evolucaoPatrimonio: PosicaoMensalTotal[];
-  divisaoDespesas: SaldoDivisao | null;
+  divisaoDespesas: SaldoDivisaoGrupo | null;
 };
 
 export async function buscarEvolucaoPatrimonioTotal(
@@ -122,7 +122,7 @@ export async function buscarRelatorioAnual(
     buscarResumoPorCategoria(prisma, householdId, { ano }),
     buscarResumoPorSubcategoria(prisma, householdId, { ano }),
     buscarEvolucaoPatrimonioTotal(prisma, householdId, ano),
-    buscarSaldoDivisao(prisma, householdId, {
+    buscarSaldoDivisaoGrupo(prisma, householdId, {
       dataInicio: new Date(Date.UTC(ano, 0, 1)),
       dataFim: new Date(Date.UTC(ano, 11, 31)),
     }),
@@ -136,7 +136,7 @@ export async function buscarRelatorioAnual(
     })),
     {
       pessoaId: null,
-      label: "Casal/Família",
+      label: "Compartilhado",
       itens: planejadoVsRealFamilia,
     },
   ];
