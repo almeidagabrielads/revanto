@@ -126,6 +126,12 @@ export function ExportarDadosClient() {
     const csv = [cabecalho.join(","), ...linhas].join("\n");
     const hoje = new Date().toISOString().slice(0, 10);
     baixarCsv(`lancamentos-${hoje}.csv`, csv);
+
+    fetch("/api/atividades", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ acao: "Exportou lançamentos (CSV)" }),
+    }).catch(() => {});
   }
 
   if (naoAutenticado) {

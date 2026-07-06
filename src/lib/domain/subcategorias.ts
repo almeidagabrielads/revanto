@@ -4,10 +4,20 @@ import type { PrismaClient } from "@/generated/prisma/client";
 export const CriarSubcategoriaSchema = z.object({
   nome: z.string().trim().min(1, "Nome é obrigatório."),
   categoriaId: z.string().trim().min(1, "Categoria é obrigatória."),
+  orcamentoCentavos: z
+    .number()
+    .int()
+    .min(0, "Orçamento não pode ser negativo.")
+    .nullish(),
 });
 
 export const AtualizarSubcategoriaSchema = z.object({
   nome: z.string().trim().min(1, "Nome é obrigatório.").optional(),
+  orcamentoCentavos: z
+    .number()
+    .int()
+    .min(0, "Orçamento não pode ser negativo.")
+    .nullish(),
 });
 
 export type CriarSubcategoriaInput = z.infer<typeof CriarSubcategoriaSchema>;

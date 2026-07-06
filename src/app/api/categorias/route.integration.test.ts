@@ -101,30 +101,18 @@ describe("POST /api/categorias", () => {
   it("cria categoria vinculada ao household da sessão", async () => {
     const { household, cookie } = await criarHouseholdComSessao();
 
-    const response = await POST(
-      postRequest({ nome: "Casa", percentualOrcamento: 25 }, cookie),
-    );
+    const response = await POST(postRequest({ nome: "Casa" }, cookie));
     const body = await response.json();
 
     expect(response.status).toBe(201);
     expect(body.nome).toBe("Casa");
     expect(body.householdId).toBe(household.id);
-    expect(Number(body.percentualOrcamento)).toBe(25);
   });
 
   it("retorna 400 para nome vazio", async () => {
     const { cookie } = await criarHouseholdComSessao();
 
     const response = await POST(postRequest({ nome: "" }, cookie));
-    expect(response.status).toBe(400);
-  });
-
-  it("retorna 400 para percentual fora do intervalo", async () => {
-    const { cookie } = await criarHouseholdComSessao();
-
-    const response = await POST(
-      postRequest({ nome: "Casa", percentualOrcamento: 150 }, cookie),
-    );
     expect(response.status).toBe(400);
   });
 

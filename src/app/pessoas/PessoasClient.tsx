@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { corPessoa } from "../components/PessoaBadge";
 import { useConfirmDialog } from "../components/ConfirmDialog";
 
 const TIPOS_PESSOA = [
@@ -26,6 +27,76 @@ async function parseErro(response: Response): Promise<string> {
   const body = await response.json().catch(() => null);
   if (typeof body?.error === "string") return body.error;
   return "Não foi possível completar a operação.";
+}
+
+function IconeLapis() {
+  return (
+    <svg
+      className="h-4 w-4"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+      <path d="m15 5 4 4" />
+    </svg>
+  );
+}
+
+function IconeLixeira() {
+  return (
+    <svg
+      className="h-4 w-4"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M3 6h18" />
+      <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+      <path d="M10 11v6" />
+      <path d="M14 11v6" />
+    </svg>
+  );
+}
+
+function IconeCheck() {
+  return (
+    <svg
+      className="h-4 w-4"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M20 6 9 17l-5-5" />
+    </svg>
+  );
+}
+
+function IconeX() {
+  return (
+    <svg
+      className="h-4 w-4"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M18 6 6 18" />
+      <path d="M6 6l12 12" />
+    </svg>
+  );
 }
 
 export function PessoasClient() {
@@ -122,7 +193,7 @@ export function PessoasClient() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-lg">
       {dialogConfirmacao}
 
       {erro && (
@@ -172,7 +243,7 @@ export function PessoasClient() {
         </button>
       </form>
 
-      <ul className="flex flex-col gap-2">
+      <div className="grid grid-cols-1 gap-sm sm:grid-cols-2">
         {pessoas?.map((pessoa) => (
           <PessoaItem
             key={pessoa.id}
@@ -181,7 +252,7 @@ export function PessoasClient() {
             onRemover={removerPessoa}
           />
         ))}
-      </ul>
+      </div>
 
       {pessoas?.length === 0 && (
         <p className="text-sm text-on-surface-variant">Nenhuma pessoa cadastrada.</p>
@@ -211,57 +282,98 @@ function PessoaItem({
     setEditando(false);
   }
 
+  function cancelar() {
+    setNome(pessoa.nome);
+    setTipo(pessoa.tipo);
+    setEditando(false);
+  }
+
   return (
-    <li className="flex flex-wrap items-center gap-2 rounded-xl border border-outline-variant bg-surface-container-lowest p-sm">
+    <div className="flex flex-col gap-2 rounded-xl border border-outline-variant bg-surface-container-lowest p-lg">
       {editando ? (
         <>
-          <input
-            className="rounded-lg border border-outline-variant bg-surface-container-lowest px-2 py-1"
-            value={nome}
-            onChange={(e) => setNome(e.target.value)}
-          />
-          <select
-            className="rounded-lg border border-outline-variant bg-surface-container-lowest px-2 py-1"
-            value={tipo}
-            onChange={(e) => setTipo(e.target.value as TipoPessoa)}
-          >
-            {TIPOS_PESSOA.map((t) => (
-              <option key={t.value} value={t.value}>
-                {t.label}
-              </option>
-            ))}
-          </select>
-          <button
-            className="text-sm font-semibold text-success"
-            onClick={salvar}
-          >
-            Salvar
-          </button>
-          <button
-            className="text-sm text-on-surface-variant"
-            onClick={() => setEditando(false)}
-          >
-            Cancelar
-          </button>
+          <div className="flex items-center gap-2">
+            <span
+              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold ${corPessoa(pessoa.id)}`}
+            >
+              {nome.charAt(0).toUpperCase() || "?"}
+            </span>
+            <input
+              className="min-w-0 flex-1 rounded-lg border border-outline-variant bg-surface-container-lowest px-2 py-1 text-sm"
+              value={nome}
+              onChange={(e) => setNome(e.target.value)}
+              autoFocus
+            />
+          </div>
+          <div className="flex items-center justify-between gap-2">
+            <select
+              className="rounded-lg border border-outline-variant bg-surface-container-lowest px-2 py-1 text-xs"
+              value={tipo}
+              onChange={(e) => setTipo(e.target.value as TipoPessoa)}
+            >
+              {TIPOS_PESSOA.map((t) => (
+                <option key={t.value} value={t.value}>
+                  {t.label}
+                </option>
+              ))}
+            </select>
+            <div className="flex items-center gap-1">
+              <button
+                title="Salvar"
+                aria-label="Salvar"
+                onClick={salvar}
+                className="rounded-full p-1.5 text-success transition-colors hover:bg-success/15"
+              >
+                <IconeCheck />
+              </button>
+              <button
+                title="Cancelar"
+                aria-label="Cancelar"
+                onClick={cancelar}
+                className="rounded-full p-1.5 text-on-surface-variant transition-colors hover:bg-surface-container-low"
+              >
+                <IconeX />
+              </button>
+            </div>
+          </div>
         </>
       ) : (
-        <>
-          <h2 className="text-base font-semibold text-on-surface">{pessoa.nome}</h2>
-          <span className="text-sm text-on-surface-variant">{labelTipo(pessoa.tipo)}</span>
-          <button
-            className="text-sm font-medium text-primary"
-            onClick={() => setEditando(true)}
-          >
-            Editar
-          </button>
-          <button
-            className="text-sm font-medium text-danger"
-            onClick={() => onRemover(pessoa)}
-          >
-            Remover
-          </button>
-        </>
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <span
+              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold ${corPessoa(pessoa.id)}`}
+            >
+              {pessoa.nome.charAt(0).toUpperCase()}
+            </span>
+            <div>
+              <h3 className="text-base font-semibold text-on-surface">
+                {pessoa.nome}
+              </h3>
+              <span className="text-xs font-semibold text-on-surface-variant">
+                {labelTipo(pessoa.tipo)}
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center gap-1">
+            <button
+              title="Editar"
+              aria-label="Editar"
+              onClick={() => setEditando(true)}
+              className="rounded-full p-1.5 text-primary transition-colors hover:bg-primary/10"
+            >
+              <IconeLapis />
+            </button>
+            <button
+              title="Remover"
+              aria-label="Remover"
+              onClick={() => onRemover(pessoa)}
+              className="rounded-full p-1.5 text-danger transition-colors hover:bg-danger-container"
+            >
+              <IconeLixeira />
+            </button>
+          </div>
+        </div>
       )}
-    </li>
+    </div>
   );
 }

@@ -14,6 +14,9 @@ export default defineConfig({
     // Testes de integração truncam o banco de teste inteiro em beforeAll/afterEach;
     // rodar arquivos em paralelo causa truncagem cruzada entre suites concorrentes.
     fileParallelism: false,
+    // Evita rodar cópias duplicadas/desatualizadas dos testes que vivem em
+    // worktrees git isoladas de outras sessões (.claude/worktrees/**).
+    exclude: ["**/node_modules/**", "**/.claude/**"],
   },
   resolve: {
     alias: {

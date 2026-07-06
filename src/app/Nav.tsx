@@ -13,7 +13,6 @@ const LINKS = [
   { href: "/", label: "Dashboard" },
   { href: "/lancamentos", label: "Lançamentos" },
   { href: "/receitas", label: "Receitas" },
-  { href: "/orcamento", label: "Orçamento" },
   { href: "/investimentos", label: "Investimentos" },
   { href: "/divisao", label: "Divisão" },
   { href: "/relatorios", label: "Relatórios" },
@@ -52,7 +51,7 @@ export function Nav() {
         const dados: Pessoa[] = await response.json();
         setPessoas(unicosPorId(dados).filter((p) => p.tipo === "INDIVIDUAL"));
       })
-      .catch(() => {});
+      .catch(() => { });
     return () => {
       cancelado = true;
     };

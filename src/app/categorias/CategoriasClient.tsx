@@ -1,18 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 
 type Subcategoria = {
   id: string;
   nome: string;
   categoriaId: string;
+  orcamentoCentavos: number | null;
   ativo: boolean;
 };
 
 type Categoria = {
   id: string;
   nome: string;
-  percentualOrcamento: string | null;
   ativo: boolean;
   subcategorias: Subcategoria[];
 };
@@ -23,12 +23,149 @@ async function parseErro(response: Response): Promise<string> {
   return "Não foi possível completar a operação.";
 }
 
+function centavosParaReais(centavos: number): string {
+  return (centavos / 100).toLocaleString("pt-BR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+function reaisParaCentavos(valor: string): number | null {
+  const normalizado = valor.trim().replace(",", ".");
+  if (normalizado === "") return null;
+  const numero = Number(normalizado);
+  if (Number.isNaN(numero)) return null;
+  return Math.round(numero * 100);
+}
+
+function somaOrcamentoCategoria(categoria: Categoria): number {
+  return categoria.subcategorias
+    .filter((s) => s.ativo)
+    .reduce((total, s) => total + (s.orcamentoCentavos ?? 0), 0);
+}
+
+function IconePasta() {
+  return (
+    <svg
+      className="h-5 w-5"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M4 4h6l2 2h8a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Z" />
+    </svg>
+  );
+}
+
+function IconeLapis() {
+  return (
+    <svg
+      className="h-4 w-4"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+      <path d="m15 5 4 4" />
+    </svg>
+  );
+}
+
+function IconeCheck() {
+  return (
+    <svg
+      className="h-4 w-4"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M20 6 9 17l-5-5" />
+    </svg>
+  );
+}
+
+function IconeX() {
+  return (
+    <svg
+      className="h-4 w-4"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M18 6 6 18" />
+      <path d="M6 6l12 12" />
+    </svg>
+  );
+}
+
+function IconeInativar() {
+  return (
+    <svg
+      className="h-4 w-4"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M18.36 6.64a9 9 0 1 1-12.73 0" />
+      <path d="M12 2v10" />
+    </svg>
+  );
+}
+
+function IconeReativar() {
+  return (
+    <svg
+      className="h-4 w-4"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M3 12a9 9 0 1 0 3-6.7" />
+      <path d="M3 4v5h5" />
+    </svg>
+  );
+}
+
+function IconeMais() {
+  return (
+    <svg
+      className="h-4 w-4"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M12 5v14" />
+      <path d="M5 12h14" />
+    </svg>
+  );
+}
+
 export function CategoriasClient() {
   const [categorias, setCategorias] = useState<Categoria[] | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [mostrarInativas, setMostrarInativas] = useState(false);
   const [novoNome, setNovoNome] = useState("");
-  const [novoPercentual, setNovoPercentual] = useState("");
   const [naoAutenticado, setNaoAutenticado] = useState(false);
   const [reloadToken, setReloadToken] = useState(0);
 
@@ -58,35 +195,28 @@ export function CategoriasClient() {
     };
   }, [mostrarInativas, reloadToken]);
 
-  async function criarCategoria(e: React.FormEvent) {
+  async function criarCategoria(e: FormEvent) {
     e.preventDefault();
     setErro(null);
     const response = await fetch("/api/categorias", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        nome: novoNome,
-        percentualOrcamento: novoPercentual ? Number(novoPercentual) : null,
-      }),
+      body: JSON.stringify({ nome: novoNome }),
     });
     if (!response.ok) {
       setErro(await parseErro(response));
       return;
     }
     setNovoNome("");
-    setNovoPercentual("");
     carregar();
   }
 
-  async function atualizarCategoria(
-    id: string,
-    input: { nome?: string; percentualOrcamento?: number | null },
-  ) {
+  async function atualizarCategoria(id: string, nome: string) {
     setErro(null);
     const response = await fetch(`/api/categorias/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(input),
+      body: JSON.stringify({ nome }),
     });
     if (!response.ok) {
       setErro(await parseErro(response));
@@ -108,12 +238,16 @@ export function CategoriasClient() {
     carregar();
   }
 
-  async function criarSubcategoria(categoriaId: string, nome: string) {
+  async function criarSubcategoria(
+    categoriaId: string,
+    nome: string,
+    orcamentoCentavos: number | null,
+  ) {
     setErro(null);
     const response = await fetch("/api/subcategorias", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ nome, categoriaId }),
+      body: JSON.stringify({ nome, categoriaId, orcamentoCentavos }),
     });
     if (!response.ok) {
       setErro(await parseErro(response));
@@ -122,12 +256,15 @@ export function CategoriasClient() {
     carregar();
   }
 
-  async function atualizarSubcategoria(id: string, nome: string) {
+  async function atualizarSubcategoria(
+    id: string,
+    input: { nome?: string; orcamentoCentavos?: number | null },
+  ) {
     setErro(null);
     const response = await fetch(`/api/subcategorias/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ nome }),
+      body: JSON.stringify(input),
     });
     if (!response.ok) {
       setErro(await parseErro(response));
@@ -159,7 +296,7 @@ export function CategoriasClient() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-lg">
       {erro && (
         <p className="rounded-lg border border-danger/30 bg-danger-container p-sm text-sm text-on-danger-container">
           {erro}
@@ -182,21 +319,6 @@ export function CategoriasClient() {
             required
           />
         </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-xs font-semibold text-on-surface-variant" htmlFor="novo-percentual">
-            % orçamento
-          </label>
-          <input
-            id="novo-percentual"
-            type="number"
-            min={0}
-            max={100}
-            step="0.01"
-            className="w-24 rounded-lg border border-outline-variant bg-surface-container-lowest px-2 py-1"
-            value={novoPercentual}
-            onChange={(e) => setNovoPercentual(e.target.value)}
-          />
-        </div>
         <button
           type="submit"
           className="rounded-full bg-primary px-md py-1.5 text-xs font-semibold text-on-primary hover:opacity-90"
@@ -214,7 +336,7 @@ export function CategoriasClient() {
         Mostrar categorias inativas
       </label>
 
-      <ul className="flex flex-col gap-4">
+      <div className="flex flex-col gap-md">
         {categorias?.map((categoria) => (
           <CategoriaItem
             key={categoria.id}
@@ -226,7 +348,7 @@ export function CategoriasClient() {
             onAlternarAtivoSubcategoria={alternarAtivoSubcategoria}
           />
         ))}
-      </ul>
+      </div>
 
       {categorias?.length === 0 && (
         <p className="text-sm text-on-surface-variant">Nenhuma categoria encontrada.</p>
@@ -244,96 +366,120 @@ function CategoriaItem({
   onAlternarAtivoSubcategoria,
 }: {
   categoria: Categoria;
-  onAtualizar: (
-    id: string,
-    input: { nome?: string; percentualOrcamento?: number | null },
-  ) => Promise<void>;
+  onAtualizar: (id: string, nome: string) => Promise<void>;
   onAlternarAtivo: (categoria: Categoria) => Promise<void>;
-  onCriarSubcategoria: (categoriaId: string, nome: string) => Promise<void>;
-  onAtualizarSubcategoria: (id: string, nome: string) => Promise<void>;
+  onCriarSubcategoria: (
+    categoriaId: string,
+    nome: string,
+    orcamentoCentavos: number | null,
+  ) => Promise<void>;
+  onAtualizarSubcategoria: (
+    id: string,
+    input: { nome?: string; orcamentoCentavos?: number | null },
+  ) => Promise<void>;
   onAlternarAtivoSubcategoria: (subcategoria: Subcategoria) => Promise<void>;
 }) {
   const [editando, setEditando] = useState(false);
   const [nome, setNome] = useState(categoria.nome);
-  const [percentual, setPercentual] = useState(
-    categoria.percentualOrcamento ?? "",
-  );
-  const [novaSubcategoria, setNovaSubcategoria] = useState("");
+  const [novaSubNome, setNovaSubNome] = useState("");
+  const [novaSubValor, setNovaSubValor] = useState("");
 
   async function salvar() {
-    await onAtualizar(categoria.id, {
-      nome,
-      percentualOrcamento: percentual === "" ? null : Number(percentual),
-    });
+    await onAtualizar(categoria.id, nome);
+    setEditando(false);
+  }
+
+  function cancelar() {
+    setNome(categoria.nome);
     setEditando(false);
   }
 
   return (
-    <li
-      className={`rounded-xl border border-outline-variant bg-surface-container-lowest p-lg ${
+    <div
+      className={`overflow-hidden rounded-xl border border-outline-variant ${
         categoria.ativo ? "" : "opacity-60"
       }`}
     >
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex items-center justify-between gap-2 bg-primary-container/20 p-lg">
         {editando ? (
           <>
-            <input
-              className="rounded-lg border border-outline-variant bg-surface-container-lowest px-2 py-1"
-              value={nome}
-              onChange={(e) => setNome(e.target.value)}
-            />
-            <input
-              type="number"
-              min={0}
-              max={100}
-              step="0.01"
-              className="w-24 rounded-lg border border-outline-variant bg-surface-container-lowest px-2 py-1"
-              value={percentual}
-              onChange={(e) => setPercentual(e.target.value)}
-            />
-            <button
-              className="text-sm font-semibold text-success"
-              onClick={salvar}
-            >
-              Salvar
-            </button>
-            <button
-              className="text-sm text-on-surface-variant"
-              onClick={() => setEditando(false)}
-            >
-              Cancelar
-            </button>
+            <div className="flex min-w-0 flex-1 items-center gap-2">
+              <span className="text-on-surface-variant">
+                <IconePasta />
+              </span>
+              <input
+                className="min-w-0 flex-1 rounded-lg border border-outline-variant bg-surface-container-lowest px-2 py-1 text-sm"
+                value={nome}
+                onChange={(e) => setNome(e.target.value)}
+                autoFocus
+              />
+            </div>
+            <div className="flex items-center gap-1">
+              <button
+                title="Salvar"
+                aria-label="Salvar"
+                onClick={salvar}
+                className="rounded-full p-1.5 text-success transition-colors hover:bg-success/15"
+              >
+                <IconeCheck />
+              </button>
+              <button
+                title="Cancelar"
+                aria-label="Cancelar"
+                onClick={cancelar}
+                className="rounded-full p-1.5 text-on-surface-variant transition-colors hover:bg-surface-container-low"
+              >
+                <IconeX />
+              </button>
+            </div>
           </>
         ) : (
           <>
-            <h2 className="text-lg font-semibold text-on-surface">{categoria.nome}</h2>
-            <span className="text-sm text-on-surface-variant">
-              {categoria.percentualOrcamento
-                ? `${Number(categoria.percentualOrcamento)}% do orçamento`
-                : "sem % definido"}
-            </span>
-            {!categoria.ativo && (
-              <span className="rounded-full bg-surface-container px-2 py-0.5 text-xs text-on-surface-variant">
-                inativa
+            <div className="flex items-center gap-2">
+              <span className="text-on-surface-variant">
+                <IconePasta />
               </span>
-            )}
-            <button
-              className="text-sm font-medium text-primary"
-              onClick={() => setEditando(true)}
-            >
-              Editar
-            </button>
-            <button
-              className="text-sm font-medium text-tertiary-container"
-              onClick={() => onAlternarAtivo(categoria)}
-            >
-              {categoria.ativo ? "Inativar" : "Reativar"}
-            </button>
+              <h3 className="text-base font-semibold text-on-surface">
+                {categoria.nome}
+              </h3>
+              {!categoria.ativo && (
+                <span className="rounded-full bg-surface-container px-2 py-0.5 text-xs text-on-surface-variant">
+                  inativa
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-semibold text-on-surface">
+                Limite: R$ {centavosParaReais(somaOrcamentoCategoria(categoria))}
+              </span>
+              <div className="flex items-center gap-1">
+                <button
+                  title="Editar"
+                  aria-label="Editar"
+                  onClick={() => setEditando(true)}
+                  className="rounded-full p-1.5 text-primary transition-colors hover:bg-primary/10"
+                >
+                  <IconeLapis />
+                </button>
+                <button
+                  title={categoria.ativo ? "Inativar" : "Reativar"}
+                  aria-label={categoria.ativo ? "Inativar" : "Reativar"}
+                  onClick={() => onAlternarAtivo(categoria)}
+                  className={
+                    categoria.ativo
+                      ? "rounded-full p-1.5 text-danger transition-colors hover:bg-danger-container"
+                      : "rounded-full p-1.5 text-success transition-colors hover:bg-success/15"
+                  }
+                >
+                  {categoria.ativo ? <IconeInativar /> : <IconeReativar />}
+                </button>
+              </div>
+            </div>
           </>
         )}
       </div>
 
-      <ul className="mt-3 flex flex-col gap-1 pl-4">
+      <div className="flex flex-col">
         {categoria.subcategorias.map((subcategoria) => (
           <SubcategoriaItem
             key={subcategoria.id}
@@ -342,28 +488,45 @@ function CategoriaItem({
             onAlternarAtivo={onAlternarAtivoSubcategoria}
           />
         ))}
-      </ul>
+      </div>
 
       <form
-        className="mt-2 flex items-center gap-2 pl-4"
+        className="flex flex-wrap items-center gap-2 border-t border-outline-variant p-lg"
         onSubmit={async (e) => {
           e.preventDefault();
-          await onCriarSubcategoria(categoria.id, novaSubcategoria);
-          setNovaSubcategoria("");
+          await onCriarSubcategoria(
+            categoria.id,
+            novaSubNome,
+            reaisParaCentavos(novaSubValor),
+          );
+          setNovaSubNome("");
+          setNovaSubValor("");
         }}
       >
         <input
-          className="rounded-lg border border-outline-variant bg-surface-container-lowest px-2 py-1 text-sm"
+          className="min-w-0 flex-1 rounded-lg border border-outline-variant bg-surface-container-lowest px-2 py-1 text-sm"
           placeholder="Nova subcategoria"
-          value={novaSubcategoria}
-          onChange={(e) => setNovaSubcategoria(e.target.value)}
+          value={novaSubNome}
+          onChange={(e) => setNovaSubNome(e.target.value)}
           required
         />
-        <button type="submit" className="text-sm font-medium text-on-surface-variant">
-          Adicionar subcategoria
+        <input
+          className="w-28 rounded-lg border border-outline-variant bg-surface-container-lowest px-2 py-1 text-sm"
+          placeholder="R$ 0,00"
+          inputMode="decimal"
+          value={novaSubValor}
+          onChange={(e) => setNovaSubValor(e.target.value)}
+        />
+        <button
+          type="submit"
+          title="Adicionar subcategoria"
+          aria-label="Adicionar subcategoria"
+          className="rounded-full p-1.5 text-primary transition-colors hover:bg-primary/10"
+        >
+          <IconeMais />
         </button>
       </form>
-    </li>
+    </div>
   );
 }
 
@@ -373,60 +536,119 @@ function SubcategoriaItem({
   onAlternarAtivo,
 }: {
   subcategoria: Subcategoria;
-  onAtualizar: (id: string, nome: string) => Promise<void>;
+  onAtualizar: (
+    id: string,
+    input: { nome?: string; orcamentoCentavos?: number | null },
+  ) => Promise<void>;
   onAlternarAtivo: (subcategoria: Subcategoria) => Promise<void>;
 }) {
   const [editando, setEditando] = useState(false);
   const [nome, setNome] = useState(subcategoria.nome);
+  const [valor, setValor] = useState(
+    subcategoria.orcamentoCentavos != null
+      ? centavosParaReais(subcategoria.orcamentoCentavos)
+      : "",
+  );
+
+  async function salvar() {
+    await onAtualizar(subcategoria.id, {
+      nome,
+      orcamentoCentavos: reaisParaCentavos(valor),
+    });
+    setEditando(false);
+  }
+
+  function cancelar() {
+    setNome(subcategoria.nome);
+    setValor(
+      subcategoria.orcamentoCentavos != null
+        ? centavosParaReais(subcategoria.orcamentoCentavos)
+        : "",
+    );
+    setEditando(false);
+  }
 
   return (
-    <li
-      className={`flex items-center gap-2 text-sm ${
+    <div
+      className={`flex items-center justify-between gap-2 border-t border-outline-variant px-lg py-sm ${
         subcategoria.ativo ? "" : "opacity-60"
       }`}
     >
       {editando ? (
         <>
           <input
-            className="rounded-lg border border-outline-variant bg-surface-container-lowest px-2 py-0.5"
+            className="min-w-0 flex-1 rounded-lg border border-outline-variant bg-surface-container-lowest px-2 py-1 text-sm"
             value={nome}
             onChange={(e) => setNome(e.target.value)}
+            autoFocus
           />
-          <button
-            className="font-semibold text-success"
-            onClick={async () => {
-              await onAtualizar(subcategoria.id, nome);
-              setEditando(false);
-            }}
-          >
-            Salvar
-          </button>
-          <button className="text-on-surface-variant" onClick={() => setEditando(false)}>
-            Cancelar
-          </button>
+          <input
+            className="w-28 rounded-lg border border-outline-variant bg-surface-container-lowest px-2 py-1 text-sm"
+            placeholder="R$ 0,00"
+            inputMode="decimal"
+            value={valor}
+            onChange={(e) => setValor(e.target.value)}
+          />
+          <div className="flex items-center gap-1">
+            <button
+              title="Salvar"
+              aria-label="Salvar"
+              onClick={salvar}
+              className="rounded-full p-1.5 text-success transition-colors hover:bg-success/15"
+            >
+              <IconeCheck />
+            </button>
+            <button
+              title="Cancelar"
+              aria-label="Cancelar"
+              onClick={cancelar}
+              className="rounded-full p-1.5 text-on-surface-variant transition-colors hover:bg-surface-container-low"
+            >
+              <IconeX />
+            </button>
+          </div>
         </>
       ) : (
         <>
-          <span className="text-on-surface">{subcategoria.nome}</span>
-          {!subcategoria.ativo && (
-            <span className="rounded-full bg-surface-container px-1.5 py-0.5 text-xs text-on-surface-variant">
-              inativa
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-on-surface">{subcategoria.nome}</span>
+            {!subcategoria.ativo && (
+              <span className="rounded-full bg-surface-container px-1.5 py-0.5 text-xs text-on-surface-variant">
+                inativa
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-on-surface-variant">
+              {subcategoria.orcamentoCentavos != null
+                ? `R$ ${centavosParaReais(subcategoria.orcamentoCentavos)}`
+                : "sem orçamento"}
             </span>
-          )}
-          <button
-            className="font-medium text-primary"
-            onClick={() => setEditando(true)}
-          >
-            Editar
-          </button>
-          <button
-            className="font-medium text-tertiary-container"
-            onClick={() => onAlternarAtivo(subcategoria)}
-          >
-            {subcategoria.ativo ? "Inativar" : "Reativar"}
-          </button>
+            <div className="flex items-center gap-1">
+              <button
+                title="Editar"
+                aria-label="Editar"
+                onClick={() => setEditando(true)}
+                className="rounded-full p-1.5 text-primary transition-colors hover:bg-primary/10"
+              >
+                <IconeLapis />
+              </button>
+              <button
+                title={subcategoria.ativo ? "Inativar" : "Reativar"}
+                aria-label={subcategoria.ativo ? "Inativar" : "Reativar"}
+                onClick={() => onAlternarAtivo(subcategoria)}
+                className={
+                  subcategoria.ativo
+                    ? "rounded-full p-1.5 text-danger transition-colors hover:bg-danger-container"
+                    : "rounded-full p-1.5 text-success transition-colors hover:bg-success/15"
+                }
+              >
+                {subcategoria.ativo ? <IconeInativar /> : <IconeReativar />}
+              </button>
+            </div>
+          </div>
         </>
       )}
-    </li>
+    </div>
   );
 }

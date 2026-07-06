@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { corPessoa } from "../components/PessoaBadge";
 
 const TIPOS_BANCO = [
   { value: "CARTAO_CREDITO", label: "Cartão de crédito" },
@@ -16,6 +17,11 @@ function labelTipo(tipo: string): string {
   return TIPOS_BANCO.find((t) => t.value === tipo)?.label ?? tipo;
 }
 
+function iniciais(nome: string): string {
+  const primeira = nome.trim().split(/\s+/)[0] ?? "";
+  return (primeira.length <= 3 ? primeira : primeira.slice(0, 2)).toUpperCase();
+}
+
 type Banco = {
   id: string;
   nome: string;
@@ -27,6 +33,90 @@ async function parseErro(response: Response): Promise<string> {
   const body = await response.json().catch(() => null);
   if (typeof body?.error === "string") return body.error;
   return "Não foi possível completar a operação.";
+}
+
+function IconeLapis() {
+  return (
+    <svg
+      className="h-4 w-4"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+      <path d="m15 5 4 4" />
+    </svg>
+  );
+}
+
+function IconeCheck() {
+  return (
+    <svg
+      className="h-4 w-4"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M20 6 9 17l-5-5" />
+    </svg>
+  );
+}
+
+function IconeX() {
+  return (
+    <svg
+      className="h-4 w-4"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M18 6 6 18" />
+      <path d="M6 6l12 12" />
+    </svg>
+  );
+}
+
+function IconeInativar() {
+  return (
+    <svg
+      className="h-4 w-4"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M18.36 6.64a9 9 0 1 1-12.73 0" />
+      <path d="M12 2v10" />
+    </svg>
+  );
+}
+
+function IconeReativar() {
+  return (
+    <svg
+      className="h-4 w-4"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M3 12a9 9 0 1 0 3-6.7" />
+      <path d="M3 4v5h5" />
+    </svg>
+  );
 }
 
 export function BancosClient() {
@@ -176,7 +266,7 @@ export function BancosClient() {
         Mostrar bancos inativos
       </label>
 
-      <ul className="flex flex-col gap-2">
+      <div className="grid grid-cols-1 gap-sm sm:grid-cols-2">
         {bancos?.map((banco) => (
           <BancoItem
             key={banco.id}
@@ -185,7 +275,7 @@ export function BancosClient() {
             onAlternarAtivo={alternarAtivo}
           />
         ))}
-      </ul>
+      </div>
 
       {bancos?.length === 0 && (
         <p className="text-sm text-on-surface-variant">Nenhum banco encontrado.</p>
@@ -215,66 +305,107 @@ function BancoItem({
     setEditando(false);
   }
 
+  function cancelar() {
+    setNome(banco.nome);
+    setTipo(banco.tipo);
+    setEditando(false);
+  }
+
   return (
-    <li
-      className={`flex flex-wrap items-center gap-2 rounded-xl border border-outline-variant bg-surface-container-lowest p-sm ${
+    <div
+      className={`flex flex-col gap-2 rounded-xl border border-outline-variant bg-surface-container-lowest p-lg ${
         banco.ativo ? "" : "opacity-60"
       }`}
     >
       {editando ? (
         <>
-          <input
-            className="rounded-lg border border-outline-variant bg-surface-container-lowest px-2 py-1"
-            value={nome}
-            onChange={(e) => setNome(e.target.value)}
-          />
-          <select
-            className="rounded-lg border border-outline-variant bg-surface-container-lowest px-2 py-1"
-            value={tipo}
-            onChange={(e) => setTipo(e.target.value as TipoBanco)}
-          >
-            {TIPOS_BANCO.map((t) => (
-              <option key={t.value} value={t.value}>
-                {t.label}
-              </option>
-            ))}
-          </select>
-          <button
-            className="text-sm font-semibold text-success"
-            onClick={salvar}
-          >
-            Salvar
-          </button>
-          <button
-            className="text-sm text-on-surface-variant"
-            onClick={() => setEditando(false)}
-          >
-            Cancelar
-          </button>
+          <div className="flex items-center gap-2">
+            <span
+              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-sm font-bold ${corPessoa(banco.id)}`}
+            >
+              {iniciais(nome) || "?"}
+            </span>
+            <input
+              className="min-w-0 flex-1 rounded-lg border border-outline-variant bg-surface-container-lowest px-2 py-1 text-sm"
+              value={nome}
+              onChange={(e) => setNome(e.target.value)}
+              autoFocus
+            />
+          </div>
+          <div className="flex items-center justify-between gap-2">
+            <select
+              className="rounded-lg border border-outline-variant bg-surface-container-lowest px-2 py-1 text-xs"
+              value={tipo}
+              onChange={(e) => setTipo(e.target.value as TipoBanco)}
+            >
+              {TIPOS_BANCO.map((t) => (
+                <option key={t.value} value={t.value}>
+                  {t.label}
+                </option>
+              ))}
+            </select>
+            <div className="flex items-center gap-1">
+              <button
+                title="Salvar"
+                aria-label="Salvar"
+                onClick={salvar}
+                className="rounded-full p-1.5 text-success transition-colors hover:bg-success/15"
+              >
+                <IconeCheck />
+              </button>
+              <button
+                title="Cancelar"
+                aria-label="Cancelar"
+                onClick={cancelar}
+                className="rounded-full p-1.5 text-on-surface-variant transition-colors hover:bg-surface-container-low"
+              >
+                <IconeX />
+              </button>
+            </div>
+          </div>
         </>
       ) : (
-        <>
-          <h2 className="text-base font-semibold text-on-surface">{banco.nome}</h2>
-          <span className="text-sm text-on-surface-variant">{labelTipo(banco.tipo)}</span>
-          {!banco.ativo && (
-            <span className="rounded-full bg-surface-container px-2 py-0.5 text-xs text-on-surface-variant">
-              inativo
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <span
+              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-sm font-bold ${corPessoa(banco.id)}`}
+            >
+              {iniciais(banco.nome)}
             </span>
-          )}
-          <button
-            className="text-sm font-medium text-primary"
-            onClick={() => setEditando(true)}
-          >
-            Editar
-          </button>
-          <button
-            className="text-sm font-medium text-tertiary-container"
-            onClick={() => onAlternarAtivo(banco)}
-          >
-            {banco.ativo ? "Inativar" : "Reativar"}
-          </button>
-        </>
+            <div>
+              <h3 className="text-base font-semibold text-on-surface">
+                {banco.nome}
+              </h3>
+              <span className="text-xs font-semibold text-on-surface-variant">
+                {labelTipo(banco.tipo)}
+                {!banco.ativo && " · Inativo"}
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center gap-1">
+            <button
+              title="Editar"
+              aria-label="Editar"
+              onClick={() => setEditando(true)}
+              className="rounded-full p-1.5 text-primary transition-colors hover:bg-primary/10"
+            >
+              <IconeLapis />
+            </button>
+            <button
+              title={banco.ativo ? "Inativar" : "Reativar"}
+              aria-label={banco.ativo ? "Inativar" : "Reativar"}
+              onClick={() => onAlternarAtivo(banco)}
+              className={
+                banco.ativo
+                  ? "rounded-full p-1.5 text-danger transition-colors hover:bg-danger-container"
+                  : "rounded-full p-1.5 text-success transition-colors hover:bg-success/15"
+              }
+            >
+              {banco.ativo ? <IconeInativar /> : <IconeReativar />}
+            </button>
+          </div>
+        </div>
       )}
-    </li>
+    </div>
   );
 }

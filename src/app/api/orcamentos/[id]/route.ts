@@ -8,6 +8,8 @@ import {
   buscarOrcamento,
   removerOrcamento,
 } from "@/lib/domain/orcamento";
+import { registrarAtividade } from "@/lib/domain/atividades";
+import { rotularDispositivo } from "@/lib/auth/device";
 
 export async function GET(
   request: NextRequest,
@@ -69,6 +71,15 @@ export async function PATCH(
       { status: 404 },
     );
   }
+
+  await registrarAtividade(
+    prisma,
+    session.householdId,
+    session.userId,
+    "Alterou orçamento",
+    rotularDispositivo(request.headers.get("user-agent")),
+  ).catch(() => {});
+
   return NextResponse.json(orcamento);
 }
 

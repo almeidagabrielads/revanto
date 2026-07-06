@@ -90,20 +90,20 @@ describe("GET /api/categorias/[id]", () => {
 });
 
 describe("PATCH /api/categorias/[id]", () => {
-  it("atualiza percentual de orçamento", async () => {
+  it("atualiza nome", async () => {
     const { household, cookie } = await criarHouseholdComSessao();
     const categoria = await prismaTest.categoria.create({
       data: { nome: "Casa", householdId: household.id },
     });
 
     const response = await PATCH(
-      req("PATCH", cookie, { percentualOrcamento: 30 }),
+      req("PATCH", cookie, { nome: "Moradia" }),
       ctx(categoria.id),
     );
     const body = await response.json();
 
     expect(response.status).toBe(200);
-    expect(Number(body.percentualOrcamento)).toBe(30);
+    expect(body.nome).toBe("Moradia");
   });
 
   it("retorna 404 ao atualizar categoria de outro household", async () => {
@@ -122,14 +122,14 @@ describe("PATCH /api/categorias/[id]", () => {
     expect(response.status).toBe(404);
   });
 
-  it("retorna 400 para percentual inválido", async () => {
+  it("retorna 400 para nome vazio", async () => {
     const { household, cookie } = await criarHouseholdComSessao();
     const categoria = await prismaTest.categoria.create({
       data: { nome: "Casa", householdId: household.id },
     });
 
     const response = await PATCH(
-      req("PATCH", cookie, { percentualOrcamento: -5 }),
+      req("PATCH", cookie, { nome: "" }),
       ctx(categoria.id),
     );
     expect(response.status).toBe(400);

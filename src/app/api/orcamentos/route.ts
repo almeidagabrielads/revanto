@@ -7,6 +7,8 @@ import {
   criarOrcamento,
   listarOrcamentos,
 } from "@/lib/domain/orcamento";
+import { registrarAtividade } from "@/lib/domain/atividades";
+import { rotularDispositivo } from "@/lib/auth/device";
 
 function parseInt10(valor: string | null): number | undefined {
   if (valor === null) return undefined;
@@ -64,5 +66,14 @@ export async function POST(request: NextRequest) {
       { status: 404 },
     );
   }
+
+  await registrarAtividade(
+    prisma,
+    session.householdId,
+    session.userId,
+    "Alterou orçamento",
+    rotularDispositivo(request.headers.get("user-agent")),
+  ).catch(() => {});
+
   return NextResponse.json(orcamento, { status: 201 });
 }

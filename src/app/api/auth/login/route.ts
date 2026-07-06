@@ -3,6 +3,7 @@ import * as z from "zod";
 import { prisma } from "@/lib/prisma";
 import { verifyPassword } from "@/lib/auth/password";
 import { setSessionCookie } from "@/lib/auth/session";
+import { rotularDispositivo } from "@/lib/auth/device";
 
 const LoginSchema = z.object({
   email: z.email(),
@@ -34,6 +35,13 @@ export async function POST(request: Request) {
       { status: 401 },
     );
   }
+
+  const agora = new Date();
+  const dispositivo = rotularDispositivo(request.headers.get("user-agent"));
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { lastLoginAt: agora, lastSeenAt: agora, lastDevice: dispositivo },
+  });
 
   const response = NextResponse.json({
     id: user.id,

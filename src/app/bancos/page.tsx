@@ -1,10 +1,20 @@
+import { SettingsShell } from "../components/SettingsShell";
 import { BancosClient } from "./BancosClient";
 
 export default function BancosPage() {
   return (
-    <main className="mx-auto flex w-full max-w-3xl flex-col gap-lg p-lg">
-      <h1 className="text-2xl font-bold text-on-surface">Bancos e meios de pagamento</h1>
-      <BancosClient />
-    </main>
+    <SettingsShell>
+      <div className="flex flex-col gap-lg">
+        <div>
+          <h2 className="text-lg font-semibold text-on-surface">
+            Contas & Bancos
+          </h2>
+          <p className="text-sm text-on-surface-variant">
+            Bancos, cartões e corretoras usados nos lançamentos.
+          </p>
+        </div>
+        <BancosClient />
+      </div>
+    </SettingsShell>
   );
 }

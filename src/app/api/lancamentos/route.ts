@@ -7,6 +7,8 @@ import {
   criarLancamento,
   listarLancamentos,
 } from "@/lib/domain/lancamentos";
+import { registrarAtividade } from "@/lib/domain/atividades";
+import { rotularDispositivo } from "@/lib/auth/device";
 
 function parseData(valor: string | null): Date | undefined {
   if (!valor) return undefined;
@@ -61,5 +63,14 @@ export async function POST(request: NextRequest) {
       { status: 400 },
     );
   }
+
+  await registrarAtividade(
+    prisma,
+    session.householdId,
+    session.userId,
+    "Adicionou lançamento",
+    rotularDispositivo(request.headers.get("user-agent")),
+  ).catch(() => {});
+
   return NextResponse.json(lancamento, { status: 201 });
 }

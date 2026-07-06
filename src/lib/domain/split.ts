@@ -44,6 +44,34 @@ export type SaldoDivisaoGrupo = {
   transferenciasSugeridas: Transferencia[];
 };
 
+export type TotalPagoPessoa = {
+  pessoaId: string;
+  totalCentavos: number;
+};
+
+export type LancamentoDetalheDivisao = {
+  id: string;
+  data: Date;
+  descricao: string;
+  categoriaNome: string | null;
+  valorCentavos: number;
+  pessoaDivisaoId: string;
+};
+
+export type InsightDivisao = {
+  categoriaNome: string;
+  pessoaId: string;
+} | null;
+
+// Versão enriquecida usada pela tela de Acerto de Contas: além do saldo,
+// traz o total pago por pessoa, o detalhamento dos lançamentos do período e
+// um destaque (categoria com maior gasto + quem mais pagou nela).
+export type ResumoDivisaoGrupo = SaldoDivisaoGrupo & {
+  totalPagoPorPessoa: TotalPagoPessoa[];
+  lancamentos: LancamentoDetalheDivisao[];
+  insight: InsightDivisao;
+};
+
 /**
  * Divide um valor em N partes inteiras (centavos) que somam exatamente o
  * total, distribuindo o resto de centavos entre as primeiras partes.
@@ -157,7 +185,7 @@ export async function buscarSaldoDivisaoGrupo(
     dataInicio?: Date;
     dataFim?: Date;
   } = {},
-): Promise<SaldoDivisaoGrupo | null> {
+): Promise<ResumoDivisaoGrupo | null> {
   const individuais = await prisma.pessoa.findMany({
     where: { householdId, tipo: "INDIVIDUAL" },
     orderBy: { nome: "asc" },
@@ -177,23 +205,95 @@ export async function buscarSaldoDivisaoGrupo(
           }
         : {}),
     },
+    orderBy: { data: "desc" },
     select: {
+      id: true,
+      data: true,
+      descricaoOrigem: true,
+      descricaoPropria: true,
       valorCentavos: true,
       descontoCentavos: true,
       pessoaDivisaoId: true,
       pessoaPagouId: true,
       pessoaDivisao: { select: { tipo: true } },
+      categoria: { select: { nome: true } },
     },
   });
 
-  return calcularSaldoDivisaoGrupo(
-    lancamentos.map((l) => ({
-      valorCentavos: l.valorCentavos,
-      descontoCentavos: l.descontoCentavos,
-      pessoaDivisaoId: l.pessoaDivisaoId,
-      pessoaDivisaoTipo: l.pessoaDivisao.tipo,
-      pessoaPagouId: l.pessoaPagouId,
-    })),
-    individuais.map((p) => p.id),
+  const participanteIds = individuais.map((p) => p.id);
+  const lancamentosParaDivisao = lancamentos.map((l) => ({
+    valorCentavos: l.valorCentavos,
+    descontoCentavos: l.descontoCentavos,
+    pessoaDivisaoId: l.pessoaDivisaoId,
+    pessoaDivisaoTipo: l.pessoaDivisao.tipo,
+    pessoaPagouId: l.pessoaPagouId,
+  }));
+
+  const saldo = calcularSaldoDivisaoGrupo(lancamentosParaDivisao, participanteIds);
+
+  const totalPagoPorPessoa: TotalPagoPessoa[] = participanteIds.map(
+    (pessoaId) => ({
+      pessoaId,
+      totalCentavos: lancamentosParaDivisao
+        .filter((l) => l.pessoaPagouId === pessoaId)
+        .reduce((total, l) => total + valorLiquidoCentavos(l), 0),
+    }),
   );
+
+  const lancamentosDetalhados: LancamentoDetalheDivisao[] = lancamentos.map(
+    (l) => ({
+      id: l.id,
+      data: l.data,
+      descricao: l.descricaoPropria ?? l.descricaoOrigem ?? "",
+      categoriaNome: l.categoria?.nome ?? null,
+      valorCentavos: valorLiquidoCentavos(l),
+      pessoaDivisaoId: l.pessoaDivisaoId,
+    }),
+  );
+
+  return {
+    ...saldo,
+    totalPagoPorPessoa,
+    lancamentos: lancamentosDetalhados,
+    insight: calcularInsightDivisao(lancamentos),
+  };
+}
+
+function calcularInsightDivisao(
+  lancamentos: {
+    categoria: { nome: string } | null;
+    valorCentavos: number;
+    descontoCentavos: number;
+    pessoaPagouId: string;
+  }[],
+): InsightDivisao {
+  const totalPorCategoria = new Map<string, number>();
+  for (const l of lancamentos) {
+    if (!l.categoria) continue;
+    const atual = totalPorCategoria.get(l.categoria.nome) ?? 0;
+    totalPorCategoria.set(
+      l.categoria.nome,
+      atual + valorLiquidoCentavos(l),
+    );
+  }
+  if (totalPorCategoria.size === 0) return null;
+
+  const [categoriaNome] = [...totalPorCategoria.entries()].sort(
+    (a, b) => b[1] - a[1],
+  )[0];
+
+  const totalPorPessoaNaCategoria = new Map<string, number>();
+  for (const l of lancamentos) {
+    if (l.categoria?.nome !== categoriaNome) continue;
+    const atual = totalPorPessoaNaCategoria.get(l.pessoaPagouId) ?? 0;
+    totalPorPessoaNaCategoria.set(
+      l.pessoaPagouId,
+      atual + valorLiquidoCentavos(l),
+    );
+  }
+  const [pessoaId] = [...totalPorPessoaNaCategoria.entries()].sort(
+    (a, b) => b[1] - a[1],
+  )[0];
+
+  return { categoriaNome, pessoaId };
 }

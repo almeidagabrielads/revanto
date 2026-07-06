@@ -37,6 +37,14 @@ enum TipoBanco {
   OUTRO
 }
 
+// Nível de acesso do usuário ao household (RF: gestão de acesso).
+enum PapelUsuario {
+  PROPRIETARIO
+  ADMIN
+  EDITOR
+  VISUALIZADOR
+}
+
 // ─── Tenant ───────────────────────────────────────────────────────────────────
 
 model Household {
@@ -55,6 +63,8 @@ model Household {
   investimentos      Investimento[]
   posicoesPatrimonio PosicaoPatrimonio[]
   preferencia        Preferencia?
+  atividades         AtividadeLog[]
+  acertos            AcertoContas[]
 }
 
 // Preferências regionais/de exibição do household (RF: configurações do sistema).
@@ -71,15 +81,36 @@ model Preferencia {
 }
 
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
+  id           String       @id @default(cuid())
+  email        String       @unique
   nome         String
   passwordHash String
+  role         PapelUsuario @default(EDITOR)
+  // Preenchidos no login e a cada checagem de sessão ativa (RF: "ativa agora"/"último acesso").
+  lastLoginAt  DateTime?
+  lastSeenAt   DateTime?
+  lastDevice   String?
   householdId  String
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  household  Household      @relation(fields: [householdId], references: [id])
+  atividades AtividadeLog[]
+}
+
+// Log de atividades recentes do household (RF: configurações → pessoas & acesso).
+model AtividadeLog {
+  id          String   @id @default(cuid())
+  acao        String
+  dispositivo String?
+  householdId String
+  userId      String?
+  createdAt   DateTime @default(now())
 
   household Household @relation(fields: [householdId], references: [id])
+  user      User?     @relation(fields: [userId], references: [id])
+
+  @@index([householdId, createdAt])
 }
 
 // ─── Cadastros ────────────────────────────────────────────────────────────────
@@ -101,20 +132,41 @@ model Pessoa {
   orcamentos         OrcamentoPlanejado[]
   investimentos      Investimento[]
   posicoesPatrimonio PosicaoPatrimonio[]
+  acertosDevidos     AcertoContas[]       @relation("AcertoDe")
+  acertosRecebidos   AcertoContas[]       @relation("AcertoPara")
 
   @@unique([householdId, nome])
 }
 
+// Registro histórico de um acerto de contas marcado como pago (RF11).
+// Não altera lançamentos passados — é só um registro de que a transferência
+// sugerida para aquele período foi de fato paga.
+model AcertoContas {
+  id                 String   @id @default(cuid())
+  householdId        String
+  dataInicio         DateTime @db.Date
+  dataFim            DateTime @db.Date
+  deId               String
+  paraId             String
+  valorCentavos      Int
+  resolvidoEm        DateTime @default(now())
+  resolvidoPorUserId String?
+
+  household Household @relation(fields: [householdId], references: [id])
+  de        Pessoa    @relation("AcertoDe", fields: [deId], references: [id])
+  para      Pessoa    @relation("AcertoPara", fields: [paraId], references: [id])
+
+  @@index([householdId, resolvidoEm])
+}
+
 model Categoria {
-  id                  String   @id @default(cuid())
-  nome                String
-  // Percentual do orçamento total sugerido para esta categoria (ex.: 15.50 = 15,5%)
-  percentualOrcamento Decimal? @db.Decimal(5, 2)
+  id          String   @id @default(cuid())
+  nome        String
   // Inativação lógica — lançamentos antigos podem referenciar, então nunca excluir fisicamente.
-  ativo               Boolean  @default(true)
-  householdId         String
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  ativo       Boolean  @default(true)
+  householdId String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   household     Household            @relation(fields: [householdId], references: [id])
   subcategorias Subcategoria[]
@@ -125,14 +177,17 @@ model Categoria {
 }
 
 model Subcategoria {
-  id          String   @id @default(cuid())
-  nome        String
-  categoriaId String
+  id                String   @id @default(cuid())
+  nome              String
+  categoriaId       String
+  // Orçamento mensal sugerido para esta subcategoria, em centavos. O limite
+  // exibido para a categoria é a soma dos orçamentos de suas subcategorias.
+  orcamentoCentavos Int?
   // Inativação lógica — lançamentos antigos podem referenciar, então nunca excluir fisicamente.
-  ativo       Boolean  @default(true)
-  householdId String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  ativo             Boolean  @default(true)
+  householdId       String
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   categoria   Categoria            @relation(fields: [categoriaId], references: [id])
   lancamentos Lancamento[]

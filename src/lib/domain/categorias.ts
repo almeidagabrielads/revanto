@@ -3,11 +3,6 @@ import type { PrismaClient } from "@/generated/prisma/client";
 
 export const CriarCategoriaSchema = z.object({
   nome: z.string().trim().min(1, "Nome é obrigatório."),
-  percentualOrcamento: z
-    .number()
-    .min(0, "Percentual não pode ser negativo.")
-    .max(100, "Percentual não pode ser maior que 100.")
-    .nullish(),
 });
 
 export const AtualizarCategoriaSchema = CriarCategoriaSchema.partial();

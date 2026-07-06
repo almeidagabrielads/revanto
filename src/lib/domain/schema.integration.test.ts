@@ -126,12 +126,18 @@ describe("Categoria / Subcategoria", () => {
     expect(resultado).toHaveLength(2);
   });
 
-  it("percentualOrcamento aceita decimal com 2 casas", async () => {
+  it("orcamentoCentavos da subcategoria aceita valor inteiro em centavos", async () => {
     const h = await criarHousehold();
-    const cat = await prismaTest.categoria.create({
-      data: { nome: "Moradia", householdId: h.id, percentualOrcamento: 30.5 },
+    const cat = await criarCategoria(h.id, "Moradia");
+    const sub = await prismaTest.subcategoria.create({
+      data: {
+        nome: "Aluguel",
+        categoriaId: cat.id,
+        householdId: h.id,
+        orcamentoCentavos: 280000,
+      },
     });
-    expect(Number(cat.percentualOrcamento)).toBe(30.5);
+    expect(sub.orcamentoCentavos).toBe(280000);
   });
 });
 

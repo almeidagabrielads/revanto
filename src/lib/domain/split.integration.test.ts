@@ -159,4 +159,42 @@ describe("buscarSaldoDivisaoGrupo", () => {
     );
     expect(total).toBe(60_000); // Ana pagou pelos outros 2 (30.000 cada)
   });
+
+  it("calcula totalPagoPorPessoa, lançamentos detalhados e insight de categoria", async () => {
+    const { household, isa, gabi, categoria, banco } = await montarBase();
+    const lazer = await criarCategoria(prismaTest, household.id, {
+      nome: "Lazer",
+    });
+
+    await criarLancamento(prismaTest, household.id, {
+      data: new Date(Date.UTC(2026, 0, 10)),
+      categoriaId: categoria.id,
+      bancoId: banco.id,
+      pessoaDivisaoId: isa.id,
+      pessoaPagouId: isa.id,
+      valorCentavos: 300_00,
+    });
+    await criarLancamento(prismaTest, household.id, {
+      data: new Date(Date.UTC(2026, 0, 12)),
+      categoriaId: lazer.id,
+      bancoId: banco.id,
+      pessoaDivisaoId: gabi.id,
+      pessoaPagouId: gabi.id,
+      valorCentavos: 50_00,
+    });
+
+    const saldo = await buscarSaldoDivisaoGrupo(prismaTest, household.id, {});
+
+    expect(saldo!.totalPagoPorPessoa.sort((a, b) => a.pessoaId.localeCompare(b.pessoaId))).toEqual(
+      [
+        { pessoaId: gabi.id, totalCentavos: 50_00 },
+        { pessoaId: isa.id, totalCentavos: 300_00 },
+      ].sort((a, b) => a.pessoaId.localeCompare(b.pessoaId)),
+    );
+    expect(saldo!.lancamentos).toHaveLength(2);
+    expect(saldo!.insight).toEqual({
+      categoriaNome: "Moradia",
+      pessoaId: isa.id,
+    });
+  });
 });

@@ -26,11 +26,13 @@ async function main() {
       nome: "Isa",
       email: "isa@example.com",
       senha: process.env.SEED_SENHA_ISA ?? "isa-senha-provisoria",
+      role: "PROPRIETARIO" as const,
     },
     {
       nome: "Gabi",
       email: "gabi@example.com",
       senha: process.env.SEED_SENHA_GABI ?? "gabi-senha-provisoria",
+      role: "ADMIN" as const,
     },
   ];
 
@@ -44,12 +46,13 @@ async function main() {
     const passwordHash = await hashPassword(p.senha);
     await prisma.user.upsert({
       where: { email: p.email },
-      update: {},
+      update: { role: p.role },
       create: {
         email: p.email,
         nome: p.nome,
         passwordHash,
         householdId: household.id,
+        role: p.role,
       },
     });
   }
@@ -57,10 +60,9 @@ async function main() {
   for (const c of categoriasSeed) {
     const categoria = await prisma.categoria.upsert({
       where: { householdId_nome: { householdId: household.id, nome: c.nome } },
-      update: { percentualOrcamento: c.percentualOrcamento },
+      update: {},
       create: {
         nome: c.nome,
-        percentualOrcamento: c.percentualOrcamento,
         householdId: household.id,
       },
     });
@@ -98,12 +100,10 @@ async function main() {
 // e docs/planilha-origem/Financas-2026/Sum (Categoria).html.
 const categoriasSeed: {
   nome: string;
-  percentualOrcamento: number;
   subcategorias: string[];
 }[] = [
   {
     nome: "Alimentação",
-    percentualOrcamento: 20,
     subcategorias: [
       "Assinaturas-Alimentação",
       "Café",
@@ -114,7 +114,6 @@ const categoriasSeed: {
   },
   {
     nome: "Casa",
-    percentualOrcamento: 25,
     subcategorias: [
       "Aluguel/Condomínio",
       "Energia",
@@ -128,7 +127,6 @@ const categoriasSeed: {
   },
   {
     nome: "Diversos",
-    percentualOrcamento: 2,
     subcategorias: [
       "Presentes",
       "Contribuições",
@@ -138,7 +136,6 @@ const categoriasSeed: {
   },
   {
     nome: "Educação/Trabalho",
-    percentualOrcamento: 4,
     subcategorias: [
       "Livros",
       "Cursos",
@@ -148,7 +145,6 @@ const categoriasSeed: {
   },
   {
     nome: "Higiene Pessoal",
-    percentualOrcamento: 2,
     subcategorias: [
       "Cabelo",
       "Sabonete",
@@ -158,7 +154,6 @@ const categoriasSeed: {
   },
   {
     nome: "Lazer",
-    percentualOrcamento: 5,
     subcategorias: [
       "Bar",
       "Passeio-Lazer",
@@ -170,7 +165,6 @@ const categoriasSeed: {
   },
   {
     nome: "Pet",
-    percentualOrcamento: 3,
     subcategorias: [
       "Passeio/Hospedagem",
       "Ração",
@@ -182,7 +176,6 @@ const categoriasSeed: {
   },
   {
     nome: "Saúde",
-    percentualOrcamento: 7,
     subcategorias: [
       "Plano de Saúde",
       "Assinatura-Saúde",
@@ -194,12 +187,10 @@ const categoriasSeed: {
   },
   {
     nome: "Taxas",
-    percentualOrcamento: 2,
     subcategorias: ["Imposto de renda", "Seguros", "Anuidade/Multas"],
   },
   {
     nome: "Transporte",
-    percentualOrcamento: 12,
     subcategorias: [
       "Uber/99/Taxi",
       "Assinatura-Transporte",
@@ -216,12 +207,10 @@ const categoriasSeed: {
   },
   {
     nome: "Vestimenta",
-    percentualOrcamento: 3,
     subcategorias: ["Sapatos", "Acessórios", "Roupas"],
   },
   {
     nome: "Viagem",
-    percentualOrcamento: 15,
     subcategorias: [
       "Assinatura-Viagem",
       "Passagem",

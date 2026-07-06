@@ -30,12 +30,10 @@ describe("criarCategoria", () => {
     const h = await criarHousehold();
     const categoria = await criarCategoria(prismaTest, h.id, {
       nome: "Alimentação",
-      percentualOrcamento: 20,
     });
 
     expect(categoria.householdId).toBe(h.id);
     expect(categoria.ativo).toBe(true);
-    expect(Number(categoria.percentualOrcamento)).toBe(20);
   });
 });
 
@@ -99,11 +97,10 @@ describe("buscarCategoria", () => {
 });
 
 describe("atualizarCategoria", () => {
-  it("atualiza nome e percentual", async () => {
+  it("atualiza nome", async () => {
     const h = await criarHousehold();
     const categoria = await criarCategoria(prismaTest, h.id, {
       nome: "Casa",
-      percentualOrcamento: 10,
     });
 
     const atualizada = await atualizarCategoria(
@@ -111,11 +108,11 @@ describe("atualizarCategoria", () => {
       h.id,
       categoria.id,
       {
-        percentualOrcamento: 25,
+        nome: "Moradia",
       },
     );
 
-    expect(Number(atualizada?.percentualOrcamento)).toBe(25);
+    expect(atualizada?.nome).toBe("Moradia");
   });
 
   it("retorna null ao tentar atualizar categoria de outro household", async () => {

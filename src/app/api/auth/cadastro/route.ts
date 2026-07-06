@@ -49,6 +49,7 @@ export async function POST(request: Request) {
       email,
       nome,
       passwordHash,
+      role: "PROPRIETARIO",
       household: { create: { nome: household } },
     },
   });

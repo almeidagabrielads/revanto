@@ -1,10 +1,20 @@
+import { SettingsShell } from "../components/SettingsShell";
 import { CategoriasClient } from "./CategoriasClient";
 
 export default function CategoriasPage() {
   return (
-    <main className="mx-auto flex w-full max-w-3xl flex-col gap-lg p-lg">
-      <h1 className="text-2xl font-bold text-on-surface">Categorias e subcategorias</h1>
-      <CategoriasClient />
-    </main>
+    <SettingsShell>
+      <div className="flex flex-col gap-lg">
+        <div>
+          <h2 className="text-lg font-semibold text-on-surface">
+            Categorias & Orçamento
+          </h2>
+          <p className="text-sm text-on-surface-variant">
+            Categorias, subcategorias e percentual sugerido do orçamento.
+          </p>
+        </div>
+        <CategoriasClient />
+      </div>
+    </SettingsShell>
   );
 }

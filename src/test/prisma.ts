@@ -31,6 +31,8 @@ export async function limparBanco() {
     prismaTest.subcategoria.deleteMany(),
     prismaTest.categoria.deleteMany(),
     prismaTest.banco.deleteMany(),
+    prismaTest.acertoContas.deleteMany(),
+    prismaTest.atividadeLog.deleteMany(),
     prismaTest.pessoa.deleteMany(),
     prismaTest.user.deleteMany(),
     prismaTest.preferencia.deleteMany(),
