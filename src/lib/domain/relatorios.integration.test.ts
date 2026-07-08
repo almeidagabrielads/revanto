@@ -1,6 +1,6 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { limparBanco, prismaTest } from "@/test/prisma";
-import { criarPessoa } from "./pessoas";
+import { criarPessoa, definirIntegrantes } from "./pessoas";
 import { criarCategoria } from "./categorias";
 import { criarSubcategoria } from "./subcategorias";
 import { criarBanco } from "./bancos";
@@ -202,5 +202,52 @@ describe("buscarSaldo", () => {
       despesaCentavos: 200_000,
       saldoCentavos: 300_000,
     });
+  });
+
+  it("filtrando por pessoaId de um grupo, soma a receita dos integrantes", async () => {
+    const household = await prismaTest.household.create({
+      data: { nome: "Família com renda agregada" },
+    });
+    const isa = await criarPessoa(prismaTest, household.id, {
+      nome: "Isa",
+      tipo: "INDIVIDUAL",
+    });
+    const gabi = await criarPessoa(prismaTest, household.id, {
+      nome: "Gabi",
+      tipo: "INDIVIDUAL",
+    });
+    const familia = await criarPessoa(prismaTest, household.id, {
+      nome: "Família",
+      tipo: "FAMILIA",
+    });
+    await definirIntegrantes(prismaTest, household.id, familia.id, [
+      { pessoaId: isa.id, peso: 100 },
+      { pessoaId: gabi.id, peso: 100 },
+    ]);
+
+    await criarReceita(prismaTest, household.id, {
+      pessoaId: isa.id,
+      subtipo: "SALARIO",
+      valorCentavos: 500_000,
+      mes: new Date(Date.UTC(2026, 0, 1)),
+    });
+    await criarReceita(prismaTest, household.id, {
+      pessoaId: gabi.id,
+      subtipo: "SALARIO",
+      valorCentavos: 300_000,
+      mes: new Date(Date.UTC(2026, 0, 1)),
+    });
+
+    const saldoFamilia = await buscarSaldo(prismaTest, household.id, {
+      ano: 2026,
+      pessoaId: familia.id,
+    });
+    expect(saldoFamilia.receitaCentavos).toBe(800_000);
+
+    const saldoIsa = await buscarSaldo(prismaTest, household.id, {
+      ano: 2026,
+      pessoaId: isa.id,
+    });
+    expect(saldoIsa.receitaCentavos).toBe(500_000);
   });
 });

@@ -1,6 +1,7 @@
 import type { PrismaClient } from "@/generated/prisma/client";
 import { buscarFechamento } from "./fechamentos";
 import { valorLiquidoCentavos } from "./lancamentos";
+import { resolverPessoasEfetivas } from "./pessoas";
 
 // ─── Tipos de entrada (dados já filtrados por household/pessoa/ano) ───────────
 
@@ -428,6 +429,14 @@ export async function buscarSaldo(
   householdId: string,
   opts: { ano: number; pessoaId?: string },
 ): Promise<SaldoAnual> {
+  // Renda de um grupo (CASAL/FAMILIA) = somatório da renda de quem o compõe.
+  // Despesas continuam filtradas literalmente por pessoaId (ver
+  // buscarLancamentosDoAno) — o gasto de um grupo já é tratado pelo acerto de
+  // contas (split.ts), não por agregação de indivíduos aqui.
+  const pessoaIdsReceita = opts.pessoaId
+    ? await resolverPessoasEfetivas(prisma, householdId, opts.pessoaId)
+    : undefined;
+
   const [receitas, lancamentos] = await Promise.all([
     prisma.receita.findMany({
       where: {
@@ -436,7 +445,7 @@ export async function buscarSaldo(
           gte: new Date(Date.UTC(opts.ano, 0, 1)),
           lt: new Date(Date.UTC(opts.ano + 1, 0, 1)),
         },
-        ...(opts.pessoaId ? { pessoaId: opts.pessoaId } : {}),
+        ...(pessoaIdsReceita ? { pessoaId: { in: pessoaIdsReceita } } : {}),
       },
       select: { valorCentavos: true, mes: true },
     }),

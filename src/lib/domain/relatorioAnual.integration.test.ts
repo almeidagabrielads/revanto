@@ -1,6 +1,6 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { limparBanco, prismaTest } from "@/test/prisma";
-import { criarPessoa } from "./pessoas";
+import { criarPessoa, definirIntegrantes } from "./pessoas";
 import { criarCategoria } from "./categorias";
 import { criarSubcategoria } from "./subcategorias";
 import { criarBanco } from "./bancos";
@@ -26,6 +26,10 @@ async function montarBase() {
     nome: "Casal",
     tipo: "CASAL",
   });
+  await definirIntegrantes(prismaTest, household.id, casal.id, [
+    { pessoaId: isa.id, peso: 100 },
+    { pessoaId: gabi.id, peso: 100 },
+  ]);
   const categoria = await criarCategoria(prismaTest, household.id, {
     nome: "Moradia",
   });

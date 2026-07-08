@@ -1,6 +1,6 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { limparBanco, prismaTest } from "@/test/prisma";
-import { criarPessoa } from "./pessoas";
+import { criarPessoa, definirIntegrantes } from "./pessoas";
 import { criarCategoria } from "./categorias";
 import { criarBanco } from "./bancos";
 import { criarLancamento } from "./lancamentos";
@@ -22,6 +22,10 @@ async function montarBase() {
     nome: "Casa",
     tipo: "CASAL",
   });
+  await definirIntegrantes(prismaTest, household.id, casal.id, [
+    { pessoaId: isa.id, peso: 100 },
+    { pessoaId: gabi.id, peso: 100 },
+  ]);
   const categoria = await criarCategoria(prismaTest, household.id, {
     nome: "Moradia",
   });
@@ -65,6 +69,7 @@ describe("buscarSaldoDivisaoGrupo", () => {
     expect(saldo!.transferenciasSugeridas).toEqual([
       { deId: gabi.id, paraId: isa.id, valorCentavos: 50_000 },
     ]);
+    expect(saldo!.gruposSemComposicao).toEqual([]);
   });
 
   it("filtra lançamentos pelo período informado", async () => {
@@ -131,6 +136,11 @@ describe("buscarSaldoDivisaoGrupo", () => {
       nome: "Casa",
       tipo: "FAMILIA",
     });
+    await definirIntegrantes(prismaTest, household.id, casa.id, [
+      { pessoaId: ana.id, peso: 100 },
+      { pessoaId: bia.id, peso: 100 },
+      { pessoaId: caio.id, peso: 100 },
+    ]);
     const categoria = await criarCategoria(prismaTest, household.id, {
       nome: "Moradia",
     });
@@ -202,24 +212,26 @@ describe("buscarSaldoDivisaoGrupo", () => {
     });
   });
 
-  it("usa o pesoDivisao de cada pessoa para ratear o gasto compartilhado (split customizado)", async () => {
+  it("usa o peso de cada integrante do grupo para ratear o gasto compartilhado (split customizado)", async () => {
     const household = await prismaTest.household.create({
       data: { nome: "Casa com split 70/30" },
     });
     const isa = await criarPessoa(prismaTest, household.id, {
       nome: "Isa",
       tipo: "INDIVIDUAL",
-      pesoDivisao: 70,
     });
     const gabi = await criarPessoa(prismaTest, household.id, {
       nome: "Gabi",
       tipo: "INDIVIDUAL",
-      pesoDivisao: 30,
     });
     const casal = await criarPessoa(prismaTest, household.id, {
       nome: "Casa",
       tipo: "CASAL",
     });
+    await definirIntegrantes(prismaTest, household.id, casal.id, [
+      { pessoaId: isa.id, peso: 70 },
+      { pessoaId: gabi.id, peso: 30 },
+    ]);
     const categoria = await criarCategoria(prismaTest, household.id, {
       nome: "Moradia",
     });
@@ -242,6 +254,55 @@ describe("buscarSaldoDivisaoGrupo", () => {
     // Isa pesa 70%, Gabi pesa 30% -> Gabi deve 30.000 (30% de 100.000) para Isa.
     expect(saldo!.transferenciasSugeridas).toEqual([
       { deId: gabi.id, paraId: isa.id, valorCentavos: 30_000 },
+    ]);
+  });
+
+  it("sinaliza em gruposSemComposicao um grupo com lançamentos mas sem integrantes cadastrados", async () => {
+    const household = await prismaTest.household.create({
+      data: { nome: "Família recém-criada" },
+    });
+    const isa = await criarPessoa(prismaTest, household.id, {
+      nome: "Isa",
+      tipo: "INDIVIDUAL",
+    });
+    const gabi = await criarPessoa(prismaTest, household.id, {
+      nome: "Gabi",
+      tipo: "INDIVIDUAL",
+    });
+    const familia = await criarPessoa(prismaTest, household.id, {
+      nome: "Família",
+      tipo: "FAMILIA",
+    });
+    const categoria = await criarCategoria(prismaTest, household.id, {
+      nome: "Moradia",
+    });
+    const banco = await criarBanco(prismaTest, household.id, {
+      nome: "Nubank",
+      tipo: "CONTA_CORRENTE",
+    });
+
+    await criarLancamento(prismaTest, household.id, {
+      data: new Date(Date.UTC(2026, 0, 10)),
+      categoriaId: categoria.id,
+      bancoId: banco.id,
+      pessoaDivisaoId: familia.id,
+      pessoaPagouId: isa.id,
+      valorCentavos: 100_000,
+    });
+
+    const saldo = await buscarSaldoDivisaoGrupo(prismaTest, household.id, {});
+
+    // Sem integrantes cadastrados, o lançamento não gera acerto...
+    expect(saldo!.transferenciasSugeridas).toEqual([]);
+    expect(saldo!.saldosPorPessoa).toEqual(
+      expect.arrayContaining([
+        { pessoaId: isa.id, saldoCentavos: 0 },
+        { pessoaId: gabi.id, saldoCentavos: 0 },
+      ]),
+    );
+    // ...mas fica sinalizado, em vez de simplesmente sumir.
+    expect(saldo!.gruposSemComposicao).toEqual([
+      { pessoaId: familia.id, nome: "Família" },
     ]);
   });
 });

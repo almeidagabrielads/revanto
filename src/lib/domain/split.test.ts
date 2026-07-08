@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { calcularSaldoDivisaoGrupo, type LancamentoParaDivisao } from "./split";
+import {
+  calcularSaldoDivisaoGrupo,
+  type LancamentoParaDivisao,
+  type ParticipanteDivisao,
+} from "./split";
 
 const ISA = "isa";
 const GABI = "gabi";
@@ -16,6 +20,13 @@ function lancamento(
     pessoaPagouId: ISA,
     ...parcial,
   };
+}
+
+function grupo(
+  grupoId: string,
+  integrantes: ParticipanteDivisao[],
+): Map<string, ParticipanteDivisao[]> {
+  return new Map([[grupoId, integrantes]]);
 }
 
 function saldoDe(
@@ -39,10 +50,14 @@ describe("calcularSaldoDivisaoGrupo — casal (2 pessoas)", () => {
       }),
     ];
 
-    const saldo = calcularSaldoDivisaoGrupo(lancamentos, [
-      { pessoaId: ISA, peso: 100 },
-      { pessoaId: GABI, peso: 100 },
-    ]);
+    const saldo = calcularSaldoDivisaoGrupo(
+      lancamentos,
+      [ISA, GABI],
+      grupo("casal", [
+        { pessoaId: ISA, peso: 100 },
+        { pessoaId: GABI, peso: 100 },
+      ]),
+    );
 
     expect(saldoDe(saldo, ISA)).toBe(5_000);
     expect(saldoDe(saldo, GABI)).toBe(-5_000);
@@ -61,10 +76,7 @@ describe("calcularSaldoDivisaoGrupo — casal (2 pessoas)", () => {
       }),
     ];
 
-    const saldo = calcularSaldoDivisaoGrupo(lancamentos, [
-      { pessoaId: ISA, peso: 100 },
-      { pessoaId: GABI, peso: 100 },
-    ]);
+    const saldo = calcularSaldoDivisaoGrupo(lancamentos, [ISA, GABI]);
 
     expect(saldoDe(saldo, GABI)).toBe(8_000);
     expect(saldoDe(saldo, ISA)).toBe(-8_000);
@@ -83,10 +95,7 @@ describe("calcularSaldoDivisaoGrupo — casal (2 pessoas)", () => {
       }),
     ];
 
-    const saldo = calcularSaldoDivisaoGrupo(lancamentos, [
-      { pessoaId: ISA, peso: 100 },
-      { pessoaId: GABI, peso: 100 },
-    ]);
+    const saldo = calcularSaldoDivisaoGrupo(lancamentos, [ISA, GABI]);
 
     expect(saldoDe(saldo, ISA)).toBe(0);
     expect(saldoDe(saldo, GABI)).toBe(0);
@@ -119,10 +128,16 @@ describe("calcularSaldoDivisaoGrupo — casal (2 pessoas)", () => {
       }),
     ];
 
-    const saldo = calcularSaldoDivisaoGrupo(lancamentos, [
-      { pessoaId: ISA, peso: 100 },
-      { pessoaId: GABI, peso: 100 },
+    const integrantesPorGrupo = new Map([
+      ["casal", [{ pessoaId: ISA, peso: 100 }, { pessoaId: GABI, peso: 100 }]],
+      ["familia", [{ pessoaId: ISA, peso: 100 }, { pessoaId: GABI, peso: 100 }]],
     ]);
+
+    const saldo = calcularSaldoDivisaoGrupo(
+      lancamentos,
+      [ISA, GABI],
+      integrantesPorGrupo,
+    );
 
     // Isa pagou pela Gabi: 50.000 (metade do aluguel) + 9.000 (metade do gasto de família líquido) = 59.000
     // Menos o que Gabi pagou pela Isa (8.000) => saldo líquido de Isa = 59.000 - 8.000 = 51.000
@@ -143,10 +158,7 @@ describe("calcularSaldoDivisaoGrupo — casal (2 pessoas)", () => {
       }),
     ];
 
-    const saldo = calcularSaldoDivisaoGrupo(lancamentos, [
-      { pessoaId: ISA, peso: 100 },
-      { pessoaId: GABI, peso: 100 },
-    ]);
+    const saldo = calcularSaldoDivisaoGrupo(lancamentos, [ISA, GABI]);
 
     expect(saldoDe(saldo, ISA)).toBe(0);
     expect(saldoDe(saldo, GABI)).toBe(0);
@@ -163,13 +175,104 @@ describe("calcularSaldoDivisaoGrupo — casal (2 pessoas)", () => {
       }),
     ];
 
-    const saldo = calcularSaldoDivisaoGrupo(lancamentos, [
-      { pessoaId: ISA, peso: 100 },
-      { pessoaId: GABI, peso: 100 },
-    ]);
+    const saldo = calcularSaldoDivisaoGrupo(
+      lancamentos,
+      [ISA, GABI],
+      grupo("casal", [
+        { pessoaId: ISA, peso: 100 },
+        { pessoaId: GABI, peso: 100 },
+      ]),
+    );
 
     expect(saldoDe(saldo, GABI)).toBe(51);
     expect(saldoDe(saldo, ISA)).toBe(-51);
+  });
+});
+
+describe("calcularSaldoDivisaoGrupo — grupo sem integrantes cadastrados", () => {
+  it("lançamento de um grupo sem integrantes é ignorado, sem erro", () => {
+    const lancamentos = [
+      lancamento({
+        valorCentavos: 10_000,
+        pessoaDivisaoId: "familia",
+        pessoaDivisaoTipo: "FAMILIA",
+        pessoaPagouId: ISA,
+      }),
+    ];
+
+    const saldo = calcularSaldoDivisaoGrupo(lancamentos, [ISA, GABI]);
+
+    expect(saldoDe(saldo, ISA)).toBe(0);
+    expect(saldoDe(saldo, GABI)).toBe(0);
+    expect(saldo.transferenciasSugeridas).toEqual([]);
+  });
+
+  it("lançamento de um grupo com lista de integrantes vazia também é ignorado", () => {
+    const lancamentos = [
+      lancamento({
+        valorCentavos: 10_000,
+        pessoaDivisaoId: "familia",
+        pessoaDivisaoTipo: "FAMILIA",
+        pessoaPagouId: ISA,
+      }),
+    ];
+
+    const saldo = calcularSaldoDivisaoGrupo(
+      lancamentos,
+      [ISA, GABI],
+      grupo("familia", []),
+    );
+
+    expect(saldoDe(saldo, ISA)).toBe(0);
+    expect(saldoDe(saldo, GABI)).toBe(0);
+  });
+});
+
+describe("calcularSaldoDivisaoGrupo — dois grupos distintos no mesmo household", () => {
+  const ISA_ID = "isa";
+  const GABI_ID = "gabi";
+  const CAIO_ID = "caio";
+
+  it("cada grupo usa sua própria composição e peso, sem contaminação cruzada", () => {
+    const lancamentos = [
+      // "casal" (Isa/Gabi, 100/100) paga aluguel de R$1.000 -> metade cada
+      lancamento({
+        valorCentavos: 100_000,
+        pessoaDivisaoId: "casal",
+        pessoaDivisaoTipo: "CASAL",
+        pessoaPagouId: ISA_ID,
+      }),
+      // "republica" (Isa/Caio, 70/30) paga internet de R$100 -> 70/30
+      lancamento({
+        valorCentavos: 10_000,
+        pessoaDivisaoId: "republica",
+        pessoaDivisaoTipo: "FAMILIA",
+        pessoaPagouId: CAIO_ID,
+      }),
+    ];
+
+    const integrantesPorGrupo = new Map([
+      [
+        "casal",
+        [{ pessoaId: ISA_ID, peso: 100 }, { pessoaId: GABI_ID, peso: 100 }],
+      ],
+      [
+        "republica",
+        [{ pessoaId: ISA_ID, peso: 70 }, { pessoaId: CAIO_ID, peso: 30 }],
+      ],
+    ]);
+
+    const saldo = calcularSaldoDivisaoGrupo(
+      lancamentos,
+      [ISA_ID, GABI_ID, CAIO_ID],
+      integrantesPorGrupo,
+    );
+
+    // Casal: Isa pagou 100.000, Gabi deve 50.000 a Isa. Gabi não participa da república.
+    // República: Caio pagou 10.000, Isa deve 70% (7.000) a Caio.
+    expect(saldoDe(saldo, GABI_ID)).toBe(-50_000);
+    expect(saldoDe(saldo, ISA_ID)).toBe(50_000 - 7_000);
+    expect(saldoDe(saldo, CAIO_ID)).toBe(7_000);
   });
 });
 
@@ -188,11 +291,15 @@ describe("calcularSaldoDivisaoGrupo — grupos maiores que 2 pessoas", () => {
       }),
     ];
 
-    const saldo = calcularSaldoDivisaoGrupo(lancamentos, [
-      { pessoaId: ANA, peso: 100 },
-      { pessoaId: BIA, peso: 100 },
-      { pessoaId: CAIO, peso: 100 },
-    ]);
+    const saldo = calcularSaldoDivisaoGrupo(
+      lancamentos,
+      [ANA, BIA, CAIO],
+      grupo("casa", [
+        { pessoaId: ANA, peso: 100 },
+        { pessoaId: BIA, peso: 100 },
+        { pessoaId: CAIO, peso: 100 },
+      ]),
+    );
 
     expect(saldoDe(saldo, ANA)).toBe(6_000); // pagou pelos outros 2 (3.000 cada)
     expect(saldoDe(saldo, BIA)).toBe(-3_000);
@@ -209,11 +316,15 @@ describe("calcularSaldoDivisaoGrupo — grupos maiores que 2 pessoas", () => {
       }),
     ];
 
-    const saldo = calcularSaldoDivisaoGrupo(lancamentos, [
-      { pessoaId: ANA, peso: 100 },
-      { pessoaId: BIA, peso: 100 },
-      { pessoaId: CAIO, peso: 100 },
-    ]);
+    const saldo = calcularSaldoDivisaoGrupo(
+      lancamentos,
+      [ANA, BIA, CAIO],
+      grupo("casa", [
+        { pessoaId: ANA, peso: 100 },
+        { pessoaId: BIA, peso: 100 },
+        { pessoaId: CAIO, peso: 100 },
+      ]),
+    );
 
     // Ana pagou 100 no total; deve receber a parte de Bia (33) e Caio (33) = 66
     expect(saldoDe(saldo, ANA)).toBe(66);
@@ -239,11 +350,15 @@ describe("calcularSaldoDivisaoGrupo — grupos maiores que 2 pessoas", () => {
       }),
     ];
 
-    const saldo = calcularSaldoDivisaoGrupo(lancamentos, [
-      { pessoaId: ANA, peso: 100 },
-      { pessoaId: BIA, peso: 100 },
-      { pessoaId: CAIO, peso: 100 },
-    ]);
+    const saldo = calcularSaldoDivisaoGrupo(
+      lancamentos,
+      [ANA, BIA, CAIO],
+      grupo("casa", [
+        { pessoaId: ANA, peso: 100 },
+        { pessoaId: BIA, peso: 100 },
+        { pessoaId: CAIO, peso: 100 },
+      ]),
+    );
 
     // Ana: +60.000 (300 de Bia + 300 de Caio, em centavos: 30.000 cada)
     // Bia: -30.000 (aluguel) + 10.000 (recebeu de volta pelo gasto do Caio) = -20.000
@@ -281,9 +396,7 @@ describe("calcularSaldoDivisaoGrupo — grupos maiores que 2 pessoas", () => {
       }),
     ];
 
-    const saldo = calcularSaldoDivisaoGrupo(lancamentos, [
-      { pessoaId: ANA, peso: 100 },
-    ]);
+    const saldo = calcularSaldoDivisaoGrupo(lancamentos, [ANA]);
 
     expect(saldoDe(saldo, ANA)).toBe(0);
     expect(saldo.transferenciasSugeridas).toEqual([]);
@@ -305,10 +418,14 @@ describe("calcularSaldoDivisaoGrupo — split customizado por peso", () => {
       }),
     ];
 
-    const saldo = calcularSaldoDivisaoGrupo(lancamentos, [
-      { pessoaId: ISA, peso: 60 },
-      { pessoaId: GABI, peso: 40 },
-    ]);
+    const saldo = calcularSaldoDivisaoGrupo(
+      lancamentos,
+      [ISA, GABI],
+      grupo("casal", [
+        { pessoaId: ISA, peso: 60 },
+        { pessoaId: GABI, peso: 40 },
+      ]),
+    );
 
     // Isa paga o total; Gabi deve a fração correspondente ao seu peso (40%).
     expect(saldoDe(saldo, GABI)).toBe(-4_000);
@@ -325,11 +442,15 @@ describe("calcularSaldoDivisaoGrupo — split customizado por peso", () => {
       }),
     ];
 
-    const saldo = calcularSaldoDivisaoGrupo(lancamentos, [
-      { pessoaId: ANA, peso: 1 },
-      { pessoaId: BIA, peso: 1 },
-      { pessoaId: CAIO, peso: 1 },
-    ]);
+    const saldo = calcularSaldoDivisaoGrupo(
+      lancamentos,
+      [ANA, BIA, CAIO],
+      grupo("casa", [
+        { pessoaId: ANA, peso: 1 },
+        { pessoaId: BIA, peso: 1 },
+        { pessoaId: CAIO, peso: 1 },
+      ]),
+    );
 
     expect(saldoDe(saldo, BIA)).toBe(-33);
     expect(saldoDe(saldo, CAIO)).toBe(-33);
@@ -346,11 +467,15 @@ describe("calcularSaldoDivisaoGrupo — split customizado por peso", () => {
       }),
     ];
 
-    const saldo = calcularSaldoDivisaoGrupo(lancamentos, [
-      { pessoaId: ANA, peso: 100 },
-      { pessoaId: BIA, peso: 100 },
-      { pessoaId: CAIO, peso: 0 },
-    ]);
+    const saldo = calcularSaldoDivisaoGrupo(
+      lancamentos,
+      [ANA, BIA, CAIO],
+      grupo("casa", [
+        { pessoaId: ANA, peso: 100 },
+        { pessoaId: BIA, peso: 100 },
+        { pessoaId: CAIO, peso: 0 },
+      ]),
+    );
 
     expect(saldoDe(saldo, CAIO)).toBe(0);
     expect(saldoDe(saldo, BIA)).toBe(-5_000);

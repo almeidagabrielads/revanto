@@ -6,22 +6,24 @@ import { valorLiquidoCentavos } from "./lancamentos";
 // Cada Lançamento tem uma pessoa "dona" do gasto (pessoaDivisao) e uma pessoa
 // que efetivamente pagou (pessoaPagou). Quando a dona do gasto é uma pessoa do
 // tipo INDIVIDUAL diferente de quem pagou, quem pagou pagou 100% em nome dela.
-// Quando a divisão é CASAL ou FAMÍLIA (gasto compartilhado pela casa), quem
+// Quando a divisão é CASAL ou FAMÍLIA (gasto compartilhado por um grupo), quem
 // pagou só pagou "pelos outros" a fração que caberia a cada um dos demais
-// participantes — dividida proporcionalmente ao peso de divisão (pesoDivisao)
-// de cada pessoa do tipo INDIVIDUAL cadastrada, não apenas duas. Pesos iguais
-// (padrão) resultam em partes iguais; pesos diferentes (ex.: 60/40) permitem
-// um split customizado. Isso vale tanto para uma pessoa que mora sozinha
-// (nada a acertar) quanto para um casal, uma família com vários membros ou um
-// grupo de amigos dividindo a casa. Divisão do tipo OUTRO (terceiro, ex. um
-// convidado) não entra no acerto de contas.
+// integrantes DAQUELE grupo específico — dividida proporcionalmente ao peso de
+// cada integrante (ver IntegranteGrupo no schema), não mais entre todas as
+// pessoas INDIVIDUAL do household. Pesos iguais (padrão) resultam em partes
+// iguais; pesos diferentes (ex.: 60/40) permitem um split customizado. Um
+// grupo sem integrantes cadastrados não gera acerto para seus lançamentos
+// (mesmo tratamento dado a OUTRO) — ver `gruposSemComposicao` no retorno de
+// `buscarSaldoDivisaoGrupo` para sinalizar esse caso à UI. Divisão do tipo
+// OUTRO (terceiro, ex. um convidado) nunca entra no acerto de contas.
 
 export type TipoPessoaDivisao = "INDIVIDUAL" | "CASAL" | "FAMILIA" | "OUTRO";
 
 export type ParticipanteDivisao = {
   pessoaId: string;
-  // Peso relativo para divisão proporcional dos gastos compartilhados.
-  // Pesos iguais entre os participantes equivalem a divisão igualitária.
+  // Peso relativo para divisão proporcional do gasto de um grupo específico
+  // (ver IntegranteGrupo). Pesos iguais entre os integrantes de um mesmo
+  // grupo equivalem a divisão igualitária.
   peso: number;
 };
 
@@ -72,6 +74,15 @@ export type InsightDivisao = {
   pessoaId: string;
 } | null;
 
+// Grupo (CASAL/FAMILIA) que teve lançamentos no período mas não tem nenhum
+// integrante cadastrado — esses lançamentos foram excluídos do acerto porque
+// não há como saber entre quem dividir. Sinaliza isso à UI em vez de deixar o
+// gasto "sumir" silenciosamente do cálculo.
+export type GrupoSemComposicao = {
+  pessoaId: string;
+  nome: string;
+};
+
 // Versão enriquecida usada pela tela de Acerto de Contas: além do saldo,
 // traz o total pago por pessoa, o detalhamento dos lançamentos do período e
 // um destaque (categoria com maior gasto + quem mais pagou nela).
@@ -79,6 +90,7 @@ export type ResumoDivisaoGrupo = SaldoDivisaoGrupo & {
   totalPagoPorPessoa: TotalPagoPessoa[];
   lancamentos: LancamentoDetalheDivisao[];
   insight: InsightDivisao;
+  gruposSemComposicao: GrupoSemComposicao[];
 };
 
 /**
@@ -157,10 +169,9 @@ function simplificarTransferencias(saldos: SaldoPessoa[]): Transferencia[] {
 
 export function calcularSaldoDivisaoGrupo(
   lancamentos: LancamentoParaDivisao[],
-  participantesDivisao: ParticipanteDivisao[],
+  participanteIds: string[],
+  integrantesPorGrupo: Map<string, ParticipanteDivisao[]> = new Map(),
 ): SaldoDivisaoGrupo {
-  const participanteIds = participantesDivisao.map((p) => p.pessoaId);
-  const pesos = participantesDivisao.map((p) => p.peso);
   const participantes = new Set(participanteIds);
   const saldo = new Map<string, number>(participanteIds.map((id) => [id, 0]));
 
@@ -180,17 +191,31 @@ export function calcularSaldoDivisaoGrupo(
       continue;
     }
 
-    // CASAL ou FAMÍLIA: gasto compartilhado pela casa, dividido
-    // proporcionalmente ao peso de cada participante. Quem pagou só pagou
-    // "pelos outros" a fração que coube a cada um deles (a própria fração
-    // não gera débito).
-    if (participanteIds.length === 0) continue;
+    // CASAL ou FAMÍLIA: gasto compartilhado por um grupo específico, dividido
+    // proporcionalmente ao peso de cada integrante DAQUELE grupo. Um grupo
+    // sem integrantes cadastrados não entra no acerto (mesmo tratamento de
+    // OUTRO) — ver `gruposSemComposicao` em buscarSaldoDivisaoGrupo. Quem
+    // pagou só pagou "pelos outros" a fração que coube a cada integrante (a
+    // própria fração, se ele for integrante, não gera débito); se quem pagou
+    // não for integrante do grupo, é reembolsado por 100% do valor.
+    const integrantes = integrantesPorGrupo.get(lancamento.pessoaDivisaoId);
+    if (!integrantes || integrantes.length === 0) continue;
+
+    const integrantesNoAcerto = integrantes.filter((i) =>
+      participantes.has(i.pessoaId),
+    );
+    if (integrantesNoAcerto.length === 0) continue;
+
+    const pesos = integrantesNoAcerto.map((i) => i.peso);
     const partes = dividirPorPeso(valorLiquido, pesos);
-    participanteIds.forEach((pessoaId, idx) => {
-      if (pessoaId === pagador) return;
+    integrantesNoAcerto.forEach((integrante, idx) => {
+      if (integrante.pessoaId === pagador) return;
       const parte = partes[idx];
       saldo.set(pagador, (saldo.get(pagador) ?? 0) + parte);
-      saldo.set(pessoaId, (saldo.get(pessoaId) ?? 0) - parte);
+      saldo.set(
+        integrante.pessoaId,
+        (saldo.get(integrante.pessoaId) ?? 0) - parte,
+      );
     });
   }
 
@@ -214,11 +239,21 @@ export async function buscarSaldoDivisaoGrupo(
     dataFim?: Date;
   } = {},
 ): Promise<ResumoDivisaoGrupo | null> {
-  const individuais = await prisma.pessoa.findMany({
-    where: { householdId, tipo: "INDIVIDUAL" },
-    orderBy: { nome: "asc" },
-    select: { id: true, pesoDivisao: true },
-  });
+  const [individuais, grupos] = await Promise.all([
+    prisma.pessoa.findMany({
+      where: { householdId, tipo: "INDIVIDUAL" },
+      orderBy: { nome: "asc" },
+      select: { id: true },
+    }),
+    prisma.pessoa.findMany({
+      where: { householdId, tipo: { in: ["CASAL", "FAMILIA"] } },
+      select: {
+        id: true,
+        nome: true,
+        integrantes: { select: { pessoaId: true, peso: true } },
+      },
+    }),
+  ]);
   if (individuais.length < 2) return null;
 
   const lancamentos = await prisma.lancamento.findMany({
@@ -249,10 +284,12 @@ export async function buscarSaldoDivisaoGrupo(
   });
 
   const participanteIds = individuais.map((p) => p.id);
-  const participantesDivisao: ParticipanteDivisao[] = individuais.map((p) => ({
-    pessoaId: p.id,
-    peso: p.pesoDivisao,
-  }));
+  const integrantesPorGrupo = new Map<string, ParticipanteDivisao[]>(
+    grupos.map((g) => [
+      g.id,
+      g.integrantes.map((i) => ({ pessoaId: i.pessoaId, peso: i.peso })),
+    ]),
+  );
   const lancamentosParaDivisao = lancamentos.map((l) => ({
     valorCentavos: l.valorCentavos,
     descontoCentavos: l.descontoCentavos,
@@ -263,8 +300,21 @@ export async function buscarSaldoDivisaoGrupo(
 
   const saldo = calcularSaldoDivisaoGrupo(
     lancamentosParaDivisao,
-    participantesDivisao,
+    participanteIds,
+    integrantesPorGrupo,
   );
+
+  const gruposComLancamento = new Set(
+    lancamentosParaDivisao
+      .filter(
+        (l) =>
+          l.pessoaDivisaoTipo === "CASAL" || l.pessoaDivisaoTipo === "FAMILIA",
+      )
+      .map((l) => l.pessoaDivisaoId),
+  );
+  const gruposSemComposicao: GrupoSemComposicao[] = grupos
+    .filter((g) => gruposComLancamento.has(g.id) && g.integrantes.length === 0)
+    .map((g) => ({ pessoaId: g.id, nome: g.nome }));
 
   const totalPagoPorPessoa: TotalPagoPessoa[] = participanteIds.map(
     (pessoaId) => ({
@@ -291,6 +341,7 @@ export async function buscarSaldoDivisaoGrupo(
     totalPagoPorPessoa,
     lancamentos: lancamentosDetalhados,
     insight: calcularInsightDivisao(lancamentos),
+    gruposSemComposicao,
   };
 }
 

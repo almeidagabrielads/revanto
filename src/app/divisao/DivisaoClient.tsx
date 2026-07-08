@@ -19,6 +19,7 @@ type LancamentoDetalhe = {
   pessoaDivisaoId: string;
 };
 type Insight = { categoriaNome: string; pessoaId: string } | null;
+type GrupoSemComposicao = { pessoaId: string; nome: string };
 
 type Resumo = {
   participantes: string[];
@@ -27,6 +28,7 @@ type Resumo = {
   totalPagoPorPessoa: TotalPagoPessoa[];
   lancamentos: LancamentoDetalhe[];
   insight: Insight;
+  gruposSemComposicao: GrupoSemComposicao[];
 };
 
 type Acerto = {
@@ -386,6 +388,20 @@ export function DivisaoClient() {
           </Link>{" "}
           para calcular o acerto de contas. Uma casa com uma única pessoa não
           tem o que dividir.
+        </p>
+      )}
+
+      {resumo && resumo.gruposSemComposicao.length > 0 && (
+        <p className="rounded-xl border border-danger/30 bg-danger-container p-lg text-sm text-on-danger-container">
+          {resumo.gruposSemComposicao.map((g) => g.nome).join(", ")}{" "}
+          {resumo.gruposSemComposicao.length === 1 ? "não tem" : "não têm"}{" "}
+          integrantes cadastrados — os gastos atribuídos a{" "}
+          {resumo.gruposSemComposicao.length === 1 ? "esse grupo" : "esses grupos"}{" "}
+          neste período ficaram de fora do acerto. Configure a composição em{" "}
+          <Link href="/pessoas" className="font-medium underline">
+            Pessoas
+          </Link>
+          .
         </p>
       )}
 

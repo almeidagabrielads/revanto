@@ -13,23 +13,20 @@ const TIPOS_PESSOA = [
 
 type TipoPessoa = (typeof TIPOS_PESSOA)[number]["value"];
 
+const TIPOS_GRUPO = new Set<TipoPessoa>(["CASAL", "FAMILIA"]);
+
 function labelTipo(tipo: string): string {
   return TIPOS_PESSOA.find((t) => t.value === tipo)?.label ?? tipo;
 }
+
+type Integrante = { pessoaId: string; peso: number };
 
 type Pessoa = {
   id: string;
   nome: string;
   tipo: TipoPessoa;
-  pesoDivisao: number;
+  integrantes: Integrante[];
 };
-
-function percentualDivisao(pessoa: Pessoa, pessoas: Pessoa[]): number {
-  const individuais = pessoas.filter((p) => p.tipo === "INDIVIDUAL");
-  const somaPesos = individuais.reduce((soma, p) => soma + p.pesoDivisao, 0);
-  if (somaPesos <= 0) return 0;
-  return (pessoa.pesoDivisao / somaPesos) * 100;
-}
 
 async function parseErro(response: Response): Promise<string> {
   const body = await response.json().catch(() => null);
@@ -112,7 +109,6 @@ export function PessoasClient() {
   const [erro, setErro] = useState<string | null>(null);
   const [novoNome, setNovoNome] = useState("");
   const [novoTipo, setNovoTipo] = useState<TipoPessoa>("INDIVIDUAL");
-  const [novoPeso, setNovoPeso] = useState("100");
   const [naoAutenticado, setNaoAutenticado] = useState(false);
   const [reloadToken, setReloadToken] = useState(0);
   const { confirmar, dialog: dialogConfirmacao } = useConfirmDialog();
@@ -149,26 +145,19 @@ export function PessoasClient() {
     const response = await fetch("/api/pessoas", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        nome: novoNome,
-        tipo: novoTipo,
-        ...(novoTipo === "INDIVIDUAL"
-          ? { pesoDivisao: Number(novoPeso) || 100 }
-          : {}),
-      }),
+      body: JSON.stringify({ nome: novoNome, tipo: novoTipo }),
     });
     if (!response.ok) {
       setErro(await parseErro(response));
       return;
     }
     setNovoNome("");
-    setNovoPeso("100");
     carregar();
   }
 
   async function atualizarPessoa(
     id: string,
-    input: { nome?: string; tipo?: TipoPessoa; pesoDivisao?: number },
+    input: { nome?: string; tipo?: TipoPessoa },
   ) {
     setErro(null);
     const response = await fetch(`/api/pessoas/${id}`, {
@@ -178,8 +167,49 @@ export function PessoasClient() {
     });
     if (!response.ok) {
       setErro(await parseErro(response));
+      return false;
+    }
+    return true;
+  }
+
+  async function definirIntegrantes(grupoId: string, integrantes: Integrante[]) {
+    setErro(null);
+    const response = await fetch(`/api/pessoas/${grupoId}/integrantes`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(integrantes),
+    });
+    if (!response.ok) {
+      setErro(await parseErro(response));
+      return false;
+    }
+    return true;
+  }
+
+  async function salvarPessoa(
+    pessoa: Pessoa,
+    input: { nome: string; tipo: TipoPessoa },
+    integrantes: Integrante[],
+  ) {
+    if (
+      pessoa.integrantes.length > 0 &&
+      TIPOS_GRUPO.has(pessoa.tipo) &&
+      !TIPOS_GRUPO.has(input.tipo) &&
+      !(await confirmar(
+        `Mudar o tipo de "${pessoa.nome}" vai apagar a composição de grupo já cadastrada (${pessoa.integrantes.length} integrante(s)). Continuar?`,
+      ))
+    ) {
       return;
     }
+
+    const ok = await atualizarPessoa(pessoa.id, input);
+    if (!ok) return;
+
+    if (TIPOS_GRUPO.has(input.tipo)) {
+      const ok2 = await definirIntegrantes(pessoa.id, integrantes);
+      if (!ok2) return;
+    }
+
     carregar();
   }
 
@@ -259,26 +289,6 @@ export function PessoasClient() {
             ))}
           </select>
         </div>
-        {novoTipo === "INDIVIDUAL" && (
-          <div className="flex flex-col gap-1">
-            <label
-              className="text-on-surface-variant text-xs font-semibold"
-              htmlFor="novo-peso"
-              title="Usado para ratear gastos compartilhados (Casal/Família) proporcionalmente entre as pessoas Individual. Pesos iguais dividem igualmente."
-            >
-              Peso de divisão
-            </label>
-            <input
-              id="novo-peso"
-              type="number"
-              min={1}
-              step={1}
-              className="border-outline-variant bg-surface-container-lowest w-24 rounded-lg border px-2 py-1"
-              value={novoPeso}
-              onChange={(e) => setNovoPeso(e.target.value)}
-            />
-          </div>
-        )}
         <button
           type="submit"
           className="bg-primary px-md text-on-primary rounded-full py-1.5 text-xs font-semibold hover:opacity-90"
@@ -293,7 +303,7 @@ export function PessoasClient() {
             key={pessoa.id}
             pessoa={pessoa}
             pessoas={pessoas}
-            onAtualizar={atualizarPessoa}
+            onSalvar={salvarPessoa}
             onRemover={removerPessoa}
           />
         ))}
@@ -308,38 +318,65 @@ export function PessoasClient() {
   );
 }
 
+function composicaoResumo(pessoa: Pessoa, pessoas: Pessoa[]): string {
+  const somaPesos = pessoa.integrantes.reduce((s, i) => s + i.peso, 0);
+  return pessoa.integrantes
+    .map((i) => {
+      const nome = pessoas.find((p) => p.id === i.pessoaId)?.nome ?? "—";
+      const percentual = somaPesos > 0 ? (i.peso / somaPesos) * 100 : 0;
+      return `${nome} (${percentual.toFixed(0)}%)`;
+    })
+    .join(" · ");
+}
+
 function PessoaItem({
   pessoa,
   pessoas,
-  onAtualizar,
+  onSalvar,
   onRemover,
 }: {
   pessoa: Pessoa;
   pessoas: Pessoa[];
-  onAtualizar: (
-    id: string,
-    input: { nome?: string; tipo?: TipoPessoa; pesoDivisao?: number },
+  onSalvar: (
+    pessoa: Pessoa,
+    input: { nome: string; tipo: TipoPessoa },
+    integrantes: Integrante[],
   ) => Promise<void>;
   onRemover: (pessoa: Pessoa) => Promise<void>;
 }) {
   const [editando, setEditando] = useState(false);
   const [nome, setNome] = useState(pessoa.nome);
   const [tipo, setTipo] = useState<TipoPessoa>(pessoa.tipo);
-  const [peso, setPeso] = useState(String(pessoa.pesoDivisao));
+  const [integrantes, setIntegrantes] = useState<Integrante[]>(
+    pessoa.integrantes,
+  );
+
+  const individuais = pessoas.filter((p) => p.tipo === "INDIVIDUAL");
+  const somaPesos = integrantes.reduce((s, i) => s + i.peso, 0);
+
+  function alternarIntegrante(pessoaId: string, marcado: boolean) {
+    setIntegrantes((atual) =>
+      marcado
+        ? [...atual, { pessoaId, peso: 100 }]
+        : atual.filter((i) => i.pessoaId !== pessoaId),
+    );
+  }
+
+  function mudarPeso(pessoaId: string, peso: number) {
+    setIntegrantes((atual) =>
+      atual.map((i) => (i.pessoaId === pessoaId ? { ...i, peso } : i)),
+    );
+  }
 
   async function salvar() {
-    await onAtualizar(pessoa.id, {
-      nome,
-      tipo,
-      ...(tipo === "INDIVIDUAL" ? { pesoDivisao: Number(peso) || 100 } : {}),
-    });
+    await onSalvar(pessoa, { nome, tipo }, integrantes);
     setEditando(false);
   }
 
   function cancelar() {
     setNome(pessoa.nome);
     setTipo(pessoa.tipo);
-    setPeso(String(pessoa.pesoDivisao));
+    setIntegrantes(pessoa.integrantes);
     setEditando(false);
   }
 
@@ -361,30 +398,17 @@ function PessoaItem({
             />
           </div>
           <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <select
-                className="border-outline-variant bg-surface-container-lowest rounded-lg border px-2 py-1 text-xs"
-                value={tipo}
-                onChange={(e) => setTipo(e.target.value as TipoPessoa)}
-              >
-                {TIPOS_PESSOA.map((t) => (
-                  <option key={t.value} value={t.value}>
-                    {t.label}
-                  </option>
-                ))}
-              </select>
-              {tipo === "INDIVIDUAL" && (
-                <input
-                  type="number"
-                  min={1}
-                  step={1}
-                  title="Peso de divisão"
-                  className="border-outline-variant bg-surface-container-lowest w-16 rounded-lg border px-2 py-1 text-xs"
-                  value={peso}
-                  onChange={(e) => setPeso(e.target.value)}
-                />
-              )}
-            </div>
+            <select
+              className="border-outline-variant bg-surface-container-lowest rounded-lg border px-2 py-1 text-xs"
+              value={tipo}
+              onChange={(e) => setTipo(e.target.value as TipoPessoa)}
+            >
+              {TIPOS_PESSOA.map((t) => (
+                <option key={t.value} value={t.value}>
+                  {t.label}
+                </option>
+              ))}
+            </select>
             <div className="flex items-center gap-1">
               <button
                 title="Salvar"
@@ -404,6 +428,68 @@ function PessoaItem({
               </button>
             </div>
           </div>
+
+          {TIPOS_GRUPO.has(tipo) && (
+            <div className="border-outline-variant gap-sm mt-1 flex flex-col rounded-lg border p-2">
+              <span className="text-on-surface-variant text-xs font-semibold">
+                Integrantes do grupo
+              </span>
+              {individuais.length === 0 ? (
+                <p className="text-on-surface-variant text-xs">
+                  Nenhuma pessoa Individual cadastrada ainda.
+                </p>
+              ) : (
+                individuais.map((individual) => {
+                  const integrante = integrantes.find(
+                    (i) => i.pessoaId === individual.id,
+                  );
+                  const marcado = !!integrante;
+                  const percentual =
+                    marcado && somaPesos > 0
+                      ? ((integrante.peso / somaPesos) * 100).toFixed(0)
+                      : null;
+                  return (
+                    <div
+                      key={individual.id}
+                      className="flex items-center gap-2 text-sm"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={marcado}
+                        onChange={(e) =>
+                          alternarIntegrante(individual.id, e.target.checked)
+                        }
+                      />
+                      <span className="min-w-0 flex-1 truncate">
+                        {individual.nome}
+                      </span>
+                      {marcado && (
+                        <>
+                          <input
+                            type="number"
+                            min={1}
+                            step={1}
+                            title="Peso"
+                            className="border-outline-variant bg-surface-container-lowest w-16 rounded-lg border px-2 py-1 text-xs"
+                            value={integrante.peso}
+                            onChange={(e) =>
+                              mudarPeso(
+                                individual.id,
+                                Number(e.target.value) || 1,
+                              )
+                            }
+                          />
+                          <span className="text-on-surface-variant w-10 text-right text-xs">
+                            {percentual}%
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          )}
         </>
       ) : (
         <div className="flex items-center justify-between gap-2">
@@ -419,8 +505,15 @@ function PessoaItem({
               </h3>
               <span className="text-on-surface-variant text-xs font-semibold">
                 {labelTipo(pessoa.tipo)}
-                {pessoa.tipo === "INDIVIDUAL" &&
-                  ` · ${percentualDivisao(pessoa, pessoas).toFixed(0)}% da divisão (peso ${pessoa.pesoDivisao})`}
+                {TIPOS_GRUPO.has(pessoa.tipo) &&
+                  (pessoa.integrantes.length > 0 ? (
+                    <> · {composicaoResumo(pessoa, pessoas)}</>
+                  ) : (
+                    <span className="text-danger">
+                      {" "}
+                      · sem integrantes definidos
+                    </span>
+                  ))}
               </span>
             </div>
           </div>

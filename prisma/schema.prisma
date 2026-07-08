@@ -17,6 +17,7 @@ model Household {
   bancos               Banco[]
   categorias           Categoria[]
   fechamentosAnuais    FechamentoAnual[]
+  integrantesGrupo     IntegranteGrupo[]
   investimentos        Investimento[]
   lancamentos          Lancamento[]
   orcamentos           OrcamentoPlanejado[]
@@ -72,9 +73,6 @@ model Pessoa {
   id                 String               @id @default(cuid())
   nome               String
   tipo               TipoPessoa
-  // Peso relativo usado para ratear gastos CASAL/FAMILIA entre as pessoas
-  // INDIVIDUAL do household (proporcional, não uma % absoluta).
-  pesoDivisao        Int                  @default(100)
   householdId        String
   createdAt          DateTime             @default(now())
   updatedAt          DateTime             @updatedAt
@@ -87,8 +85,32 @@ model Pessoa {
   household          Household            @relation(fields: [householdId], references: [id])
   posicoesPatrimonio PosicaoPatrimonio[]
   receitas           Receita[]
+  // Quando esta pessoa é um grupo (CASAL/FAMILIA): quem a compõe.
+  integrantes        IntegranteGrupo[]    @relation("GrupoIntegrantes")
+  // Quando esta pessoa é INDIVIDUAL: de quais grupos ela participa.
+  participacoes      IntegranteGrupo[]    @relation("PessoaIntegraGrupos")
 
   @@unique([householdId, nome])
+}
+
+// Composição de um grupo (Pessoa tipo CASAL/FAMILIA): quais pessoas
+// INDIVIDUAL o formam e o peso relativo de cada uma na divisão dos gastos
+// atribuídos a esse grupo (ver src/lib/domain/split.ts).
+model IntegranteGrupo {
+  id          String    @id @default(cuid())
+  grupoId     String
+  pessoaId    String
+  peso        Int       @default(100)
+  householdId String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  grupo       Pessoa    @relation("GrupoIntegrantes", fields: [grupoId], references: [id], onDelete: Cascade)
+  pessoa      Pessoa    @relation("PessoaIntegraGrupos", fields: [pessoaId], references: [id], onDelete: Cascade)
+  household   Household @relation(fields: [householdId], references: [id])
+
+  @@unique([grupoId, pessoaId])
+  @@index([householdId])
+  @@index([pessoaId])
 }
 
 model AcertoContas {
