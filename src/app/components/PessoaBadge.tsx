@@ -5,6 +5,14 @@ const PALETA = [
   "bg-danger-container text-on-danger-container",
 ] as const;
 
+// Mesma ordem de PALETA, em cores CSS utilizáveis em SVG (fill/stroke).
+const PALETA_COR_SVG = [
+  "var(--color-secondary-container)",
+  "var(--color-tertiary-container)",
+  "var(--color-success)",
+  "var(--color-danger-container)",
+] as const;
+
 const COMPARTILHADO = "bg-primary-container text-on-primary-container";
 
 function hashSimples(texto: string): number {
@@ -22,6 +30,11 @@ function hashSimples(texto: string): number {
 export function corPessoa(pessoaId: string, compartilhado = false): string {
   if (compartilhado) return COMPARTILHADO;
   return PALETA[hashSimples(pessoaId) % PALETA.length];
+}
+
+/** Mesma cor de corPessoa(), como valor CSS (para uso em SVG). */
+export function corPessoaSvg(pessoaId: string): string {
+  return PALETA_COR_SVG[hashSimples(pessoaId) % PALETA_COR_SVG.length];
 }
 
 export function PessoaBadge({
