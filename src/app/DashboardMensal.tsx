@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { unicosPorId } from "@/lib/dedupe";
+import { valorLiquidoCentavos } from "@/lib/domain/lancamentos";
 
 type SaldoMensal = {
   mes: number;
@@ -42,6 +43,7 @@ type Lancamento = {
   descricaoOrigem: string | null;
   descricaoPropria: string | null;
   valorCentavos: number;
+  descontoCentavos: number;
   pessoaDivisaoId: string;
   pessoaPagouId: string;
 };
@@ -432,7 +434,7 @@ export function DashboardMensal({ ano, mes }: { ano: number; mes: number }) {
                     {nomePessoa(l.pessoaDivisaoId)}
                   </span>
                   <span className="data-tabular text-on-surface justify-self-end font-semibold">
-                    {centavosParaReais(l.valorCentavos)}
+                    {centavosParaReais(valorLiquidoCentavos(l))}
                   </span>
                 </div>
               ))}
