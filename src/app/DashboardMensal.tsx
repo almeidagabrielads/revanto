@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { unicosPorChave, unicosPorId } from "@/lib/dedupe";
+import { unicosPorId } from "@/lib/dedupe";
 
 type SaldoMensal = {
   mes: number;
@@ -113,12 +113,7 @@ export function DashboardMensal({ ano, mes }: { ano: number; mes: number }) {
         }
 
         setSaldo(saldoRes.ok ? await saldoRes.json() : null);
-        setOrcamento(
-          unicosPorChave(
-            orcamentoRes.ok ? await orcamentoRes.json() : [],
-            (c: PlanejadoVsRealCategoria) => c.categoriaId,
-          ),
-        );
+        setOrcamento(orcamentoRes.ok ? await orcamentoRes.json() : []);
         setLancamentos(
           unicosPorId(lancamentosRes.ok ? await lancamentosRes.json() : []),
         );
@@ -161,14 +156,25 @@ export function DashboardMensal({ ano, mes }: { ano: number; mes: number }) {
 
   const saldoDoMes = saldo?.porMes.find((m) => m.mes === mes) ?? null;
 
-  const categoriasOrcamento = (orcamento ?? [])
-    .map((c) => ({
+  const totaisPorCategoria = new Map<
+    string,
+    { categoriaId: string; planejadoCentavos: number; realCentavos: number }
+  >();
+  for (const c of orcamento ?? []) {
+    const doMes = c.meses.find((m) => m.mes === mes) ?? {
+      planejadoCentavos: 0,
+      realCentavos: 0,
+    };
+    const acumulado = totaisPorCategoria.get(c.categoriaId) ?? {
       categoriaId: c.categoriaId,
-      ...(c.meses.find((m) => m.mes === mes) ?? {
-        planejadoCentavos: 0,
-        realCentavos: 0,
-      }),
-    }))
+      planejadoCentavos: 0,
+      realCentavos: 0,
+    };
+    acumulado.planejadoCentavos += doMes.planejadoCentavos;
+    acumulado.realCentavos += doMes.realCentavos;
+    totaisPorCategoria.set(c.categoriaId, acumulado);
+  }
+  const categoriasOrcamento = Array.from(totaisPorCategoria.values())
     .filter((c) => c.planejadoCentavos > 0 || c.realCentavos > 0)
     .sort((a, b) => {
       const percentualA =
