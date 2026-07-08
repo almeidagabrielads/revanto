@@ -231,6 +231,52 @@ export function calcularSaldoDivisaoGrupo(
   };
 }
 
+export type AcertoResolvido = {
+  deId: string;
+  paraId: string;
+  valorCentavos: number;
+};
+
+/**
+ * Desconta do saldo bruto (calculado a partir dos lançamentos) os acertos já
+ * resolvidos — pagamentos que já aconteceram de fato — chegando ao saldo
+ * líquido realmente pendente. Quem pagou (deId) tem sua dívida reduzida;
+ * quem recebeu (paraId) tem seu crédito reduzido.
+ */
+export function aplicarAcertosResolvidos(
+  saldo: SaldoDivisaoGrupo,
+  acertosResolvidos: AcertoResolvido[],
+): SaldoDivisaoGrupo {
+  if (acertosResolvidos.length === 0) return saldo;
+
+  const saldoAjustado = new Map(
+    saldo.saldosPorPessoa.map((s) => [s.pessoaId, s.saldoCentavos]),
+  );
+  for (const a of acertosResolvidos) {
+    saldoAjustado.set(
+      a.deId,
+      (saldoAjustado.get(a.deId) ?? 0) + a.valorCentavos,
+    );
+    saldoAjustado.set(
+      a.paraId,
+      (saldoAjustado.get(a.paraId) ?? 0) - a.valorCentavos,
+    );
+  }
+
+  const saldosPorPessoa: SaldoPessoa[] = saldo.participantes.map(
+    (pessoaId) => ({
+      pessoaId,
+      saldoCentavos: saldoAjustado.get(pessoaId) ?? 0,
+    }),
+  );
+
+  return {
+    participantes: saldo.participantes,
+    saldosPorPessoa,
+    transferenciasSugeridas: simplificarTransferencias(saldosPorPessoa),
+  };
+}
+
 export async function buscarSaldoDivisaoGrupo(
   prisma: PrismaClient,
   householdId: string,
@@ -298,11 +344,25 @@ export async function buscarSaldoDivisaoGrupo(
     pessoaPagouId: l.pessoaPagouId,
   }));
 
-  const saldo = calcularSaldoDivisaoGrupo(
+  const saldoBruto = calcularSaldoDivisaoGrupo(
     lancamentosParaDivisao,
     participanteIds,
     integrantesPorGrupo,
   );
+
+  // Desconta acertos já resolvidos (pagamentos que já aconteceram de fato)
+  // cujo período consultado no momento da resolução esteja contido no
+  // período agora consultado — sem isso, uma dívida já paga volta a aparecer
+  // sempre que o período for recalculado (ex.: visão "acumulado até hoje").
+  const acertosResolvidos = await prisma.acertoContas.findMany({
+    where: {
+      householdId,
+      ...(opts.dataInicio ? { dataInicio: { gte: opts.dataInicio } } : {}),
+      ...(opts.dataFim ? { dataFim: { lte: opts.dataFim } } : {}),
+    },
+    select: { deId: true, paraId: true, valorCentavos: true },
+  });
+  const saldo = aplicarAcertosResolvidos(saldoBruto, acertosResolvidos);
 
   const gruposComLancamento = new Set(
     lancamentosParaDivisao

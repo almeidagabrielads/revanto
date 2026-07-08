@@ -257,6 +257,86 @@ describe("buscarSaldoDivisaoGrupo", () => {
     ]);
   });
 
+  it("desconta um acerto já resolvido cujo período está contido no período consultado", async () => {
+    const { household, isa, gabi, casal, categoria, banco } =
+      await montarBase();
+
+    await criarLancamento(prismaTest, household.id, {
+      data: new Date(Date.UTC(2026, 0, 10)),
+      categoriaId: categoria.id,
+      bancoId: banco.id,
+      pessoaDivisaoId: casal.id,
+      pessoaPagouId: isa.id,
+      valorCentavos: 100_000,
+    });
+    // Bruto: Gabi deve 50.000 a Isa. Gabi já pagou 50.000 (acerto resolvido
+    // em janeiro, mesmo mês dos lançamentos).
+    await prismaTest.acertoContas.create({
+      data: {
+        householdId: household.id,
+        dataInicio: new Date(Date.UTC(2026, 0, 1)),
+        dataFim: new Date(Date.UTC(2026, 0, 31)),
+        deId: gabi.id,
+        paraId: isa.id,
+        valorCentavos: 50_000,
+      },
+    });
+
+    const saldoDoMes = await buscarSaldoDivisaoGrupo(prismaTest, household.id, {
+      dataInicio: new Date(Date.UTC(2026, 0, 1)),
+      dataFim: new Date(Date.UTC(2026, 0, 31)),
+    });
+    expect(saldoDoMes!.transferenciasSugeridas).toEqual([]);
+
+    // Consultando um período maior que contém o acerto (ex.: "acumulado até
+    // hoje"), o desconto continua valendo — a dívida paga não reaparece.
+    const saldoAcumulado = await buscarSaldoDivisaoGrupo(
+      prismaTest,
+      household.id,
+      { dataFim: new Date(Date.UTC(2026, 11, 31)) },
+    );
+    expect(saldoAcumulado!.transferenciasSugeridas).toEqual([]);
+  });
+
+  it("não desconta um acerto cujo período não está contido no período consultado", async () => {
+    const { household, isa, gabi, casal, categoria, banco } =
+      await montarBase();
+
+    await criarLancamento(prismaTest, household.id, {
+      data: new Date(Date.UTC(2026, 1, 10)),
+      categoriaId: categoria.id,
+      bancoId: banco.id,
+      pessoaDivisaoId: casal.id,
+      pessoaPagouId: isa.id,
+      valorCentavos: 100_000,
+    });
+    // Acerto resolvido em janeiro (mês sem lançamentos neste teste).
+    await prismaTest.acertoContas.create({
+      data: {
+        householdId: household.id,
+        dataInicio: new Date(Date.UTC(2026, 0, 1)),
+        dataFim: new Date(Date.UTC(2026, 0, 31)),
+        deId: gabi.id,
+        paraId: isa.id,
+        valorCentavos: 50_000,
+      },
+    });
+
+    // Consultando só fevereiro, o acerto de janeiro fica fora do período e
+    // não deve ser descontado do saldo de fevereiro.
+    const saldoFevereiro = await buscarSaldoDivisaoGrupo(
+      prismaTest,
+      household.id,
+      {
+        dataInicio: new Date(Date.UTC(2026, 1, 1)),
+        dataFim: new Date(Date.UTC(2026, 1, 28)),
+      },
+    );
+    expect(saldoFevereiro!.transferenciasSugeridas).toEqual([
+      { deId: gabi.id, paraId: isa.id, valorCentavos: 50_000 },
+    ]);
+  });
+
   it("sinaliza em gruposSemComposicao um grupo com lançamentos mas sem integrantes cadastrados", async () => {
     const household = await prismaTest.household.create({
       data: { nome: "Família recém-criada" },
