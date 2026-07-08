@@ -77,16 +77,18 @@ export function DashboardMensal({ ano, mes }: { ano: number; mes: number }) {
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [naoAutenticado, setNaoAutenticado] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const [pessoaFiltro, setPessoaFiltro] = useState("");
 
   useEffect(() => {
     let cancelado = false;
     const { inicio, fim } = primeiroEUltimoDiaDoMes(ano, mes);
+    const pessoaQuery = pessoaFiltro ? `&pessoaId=${pessoaFiltro}` : "";
 
     Promise.all([
-      fetch(`/api/relatorios/saldo?ano=${ano}`),
+      fetch(`/api/relatorios/saldo?ano=${ano}${pessoaQuery}`),
       fetch(`/api/relatorios/divisao?dataInicio=${inicio}&dataFim=${fim}`),
-      fetch(`/api/relatorios/planejado-vs-real?ano=${ano}`),
-      fetch(`/api/lancamentos?dataInicio=${inicio}&dataFim=${fim}`),
+      fetch(`/api/relatorios/planejado-vs-real?ano=${ano}${pessoaQuery}`),
+      fetch(`/api/lancamentos?dataInicio=${inicio}&dataFim=${fim}${pessoaQuery}`),
       fetch("/api/pessoas"),
       fetch("/api/categorias"),
     ])
@@ -132,7 +134,7 @@ export function DashboardMensal({ ano, mes }: { ano: number; mes: number }) {
     return () => {
       cancelado = true;
     };
-  }, [ano, mes]);
+  }, [ano, mes, pessoaFiltro]);
 
   if (naoAutenticado) {
     return (
@@ -206,6 +208,28 @@ export function DashboardMensal({ ano, mes }: { ano: number; mes: number }) {
 
   return (
     <div className="gap-lg flex flex-col">
+      <div className="flex items-center gap-2">
+        <label
+          htmlFor="pessoaFiltro"
+          className="text-on-surface-variant text-xs font-semibold tracking-wide uppercase"
+        >
+          Visualizando
+        </label>
+        <select
+          id="pessoaFiltro"
+          value={pessoaFiltro}
+          onChange={(e) => setPessoaFiltro(e.target.value)}
+          className="border-outline-variant bg-surface-container-lowest text-on-surface px-md rounded-full border py-1.5 text-sm font-semibold"
+        >
+          <option value="">Geral</option>
+          {pessoas.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.nome}
+            </option>
+          ))}
+        </select>
+      </div>
+
       {erro && (
         <p className="border-danger/30 bg-danger-container p-sm text-on-danger-container rounded-lg border text-sm">
           {erro}
