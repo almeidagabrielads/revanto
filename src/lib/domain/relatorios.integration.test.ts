@@ -250,4 +250,66 @@ describe("buscarSaldo", () => {
     });
     expect(saldoIsa.receitaCentavos).toBe(500_000);
   });
+
+  it("filtrando por pessoaId de um indivíduo, a despesa soma o gasto direto + a fração dele no grupo", async () => {
+    const household = await prismaTest.household.create({
+      data: { nome: "Casa com gasto de grupo" },
+    });
+    const isa = await criarPessoa(prismaTest, household.id, {
+      nome: "Isa",
+      tipo: "INDIVIDUAL",
+    });
+    const gabi = await criarPessoa(prismaTest, household.id, {
+      nome: "Gabi",
+      tipo: "INDIVIDUAL",
+    });
+    const familia = await criarPessoa(prismaTest, household.id, {
+      nome: "Família",
+      tipo: "FAMILIA",
+    });
+    await definirIntegrantes(prismaTest, household.id, familia.id, [
+      { pessoaId: isa.id, peso: 60 },
+      { pessoaId: gabi.id, peso: 40 },
+    ]);
+    const categoria = await criarCategoria(prismaTest, household.id, {
+      nome: "Moradia",
+    });
+    const banco = await criarBanco(prismaTest, household.id, {
+      nome: "Nubank",
+      tipo: "CONTA_CORRENTE",
+    });
+
+    // Gasto individual da Gabi.
+    await criarLancamento(prismaTest, household.id, {
+      data: new Date(Date.UTC(2026, 0, 5)),
+      categoriaId: categoria.id,
+      bancoId: banco.id,
+      pessoaDivisaoId: gabi.id,
+      pessoaPagouId: gabi.id,
+      valorCentavos: 5_000,
+    });
+    // Gasto do grupo Família, pago pela Isa.
+    await criarLancamento(prismaTest, household.id, {
+      data: new Date(Date.UTC(2026, 0, 10)),
+      categoriaId: categoria.id,
+      bancoId: banco.id,
+      pessoaDivisaoId: familia.id,
+      pessoaPagouId: isa.id,
+      valorCentavos: 100_000,
+    });
+
+    const saldoGabi = await buscarSaldo(prismaTest, household.id, {
+      ano: 2026,
+      pessoaId: gabi.id,
+    });
+    // 5.000 (dela) + 40% de 100.000 (fração dela na Família) = 45.000
+    expect(saldoGabi.despesaCentavos).toBe(45_000);
+
+    const saldoFamilia = await buscarSaldo(prismaTest, household.id, {
+      ano: 2026,
+      pessoaId: familia.id,
+    });
+    // Filtrando pelo grupo, o valor cheio do gasto do grupo (sem fração).
+    expect(saldoFamilia.despesaCentavos).toBe(100_000);
+  });
 });

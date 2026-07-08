@@ -1,7 +1,7 @@
 import type { PrismaClient } from "@/generated/prisma/client";
 import { buscarFechamento } from "./fechamentos";
 import { valorLiquidoCentavos } from "./lancamentos";
-import { resolverPessoasEfetivas } from "./pessoas";
+import { resolverFracaoPorGrupo, resolverPessoasEfetivas } from "./pessoas";
 
 // ─── Tipos de entrada (dados já filtrados por household/pessoa/ano) ───────────
 
@@ -184,22 +184,9 @@ export async function buscarPlanejadoVsReal(
         valorCentavos: true,
       },
     }),
-    prisma.lancamento.findMany({
-      where: {
-        householdId,
-        data: {
-          gte: new Date(Date.UTC(opts.ano, 0, 1)),
-          lt: new Date(Date.UTC(opts.ano + 1, 0, 1)),
-        },
-        ...(opts.pessoaId ? { pessoaDivisaoId: opts.pessoaId } : {}),
-      },
-      select: {
-        categoriaId: true,
-        subcategoriaId: true,
-        data: true,
-        valorCentavos: true,
-        descontoCentavos: true,
-      },
+    buscarLancamentosDoAno(prisma, householdId, {
+      ano: opts.ano,
+      pessoaId: opts.pessoaId ?? undefined,
     }),
     prisma.subcategoria.findMany({
       where: { householdId, orcamentoCentavos: { not: null } },
@@ -345,27 +332,62 @@ export async function buscarResumoPorSubcategoria(
   return calcularResumoPorSubcategoria(lancamentos);
 }
 
+// Gastos de uma pessoa INDIVIDUAL = seus lançamentos com divisão direta nela
+// + a fração que lhe cabe (ver resolverFracaoPorGrupo) dos lançamentos cuja
+// divisão é um grupo (CASAL/FAMILIA) do qual ela participa. Filtrar por um
+// grupo, por outro lado, traz o valor cheio dos lançamentos daquele grupo
+// (sem fração — é a visão "geral" desse grupo).
 async function buscarLancamentosDoAno(
   prisma: PrismaClient,
   householdId: string,
   opts: { ano: number; pessoaId?: string },
 ): Promise<LancamentoParaRelatorio[]> {
-  return prisma.lancamento.findMany({
+  const filtroData = {
+    gte: new Date(Date.UTC(opts.ano, 0, 1)),
+    lt: new Date(Date.UTC(opts.ano + 1, 0, 1)),
+  };
+  const camposSelecionados = {
+    categoriaId: true,
+    subcategoriaId: true,
+    data: true,
+    valorCentavos: true,
+    descontoCentavos: true,
+  } as const;
+
+  if (!opts.pessoaId) {
+    return prisma.lancamento.findMany({
+      where: { householdId, data: filtroData },
+      select: camposSelecionados,
+    });
+  }
+
+  const fracaoPorGrupo = await resolverFracaoPorGrupo(
+    prisma,
+    householdId,
+    opts.pessoaId,
+  );
+
+  const lancamentos = await prisma.lancamento.findMany({
     where: {
       householdId,
-      data: {
-        gte: new Date(Date.UTC(opts.ano, 0, 1)),
-        lt: new Date(Date.UTC(opts.ano + 1, 0, 1)),
-      },
-      ...(opts.pessoaId ? { pessoaDivisaoId: opts.pessoaId } : {}),
+      data: filtroData,
+      pessoaDivisaoId: { in: [opts.pessoaId, ...fracaoPorGrupo.keys()] },
     },
-    select: {
-      categoriaId: true,
-      subcategoriaId: true,
-      data: true,
-      valorCentavos: true,
-      descontoCentavos: true,
-    },
+    select: { ...camposSelecionados, pessoaDivisaoId: true },
+  });
+
+  return lancamentos.map((l) => {
+    const fracao =
+      l.pessoaDivisaoId === opts.pessoaId
+        ? 1
+        : (fracaoPorGrupo.get(l.pessoaDivisaoId) ?? 0);
+    return {
+      categoriaId: l.categoriaId,
+      subcategoriaId: l.subcategoriaId,
+      data: l.data,
+      valorCentavos: Math.round(l.valorCentavos * fracao),
+      descontoCentavos: Math.round(l.descontoCentavos * fracao),
+    };
   });
 }
 

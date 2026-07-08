@@ -355,11 +355,20 @@ function PessoaItem({
   const somaPesos = integrantes.reduce((s, i) => s + i.peso, 0);
 
   function alternarIntegrante(pessoaId: string, marcado: boolean) {
-    setIntegrantes((atual) =>
-      marcado
-        ? [...atual, { pessoaId, peso: 100 }]
-        : atual.filter((i) => i.pessoaId !== pessoaId),
-    );
+    setIntegrantes((atual) => {
+      const novaLista = marcado
+        ? [...atual, { pessoaId, peso: 0 }]
+        : atual.filter((i) => i.pessoaId !== pessoaId);
+      if (novaLista.length === 0) return novaLista;
+      // Distribui igualmente entre os marcados; o usuário ajusta manualmente
+      // se quiser uma divisão diferente.
+      const base = Math.floor(100 / novaLista.length);
+      const resto = 100 - base * novaLista.length;
+      return novaLista.map((i, idx) => ({
+        ...i,
+        peso: base + (idx < resto ? 1 : 0),
+      }));
+    });
   }
 
   function mudarPeso(pessoaId: string, peso: number) {
@@ -439,54 +448,61 @@ function PessoaItem({
                   Nenhuma pessoa Individual cadastrada ainda.
                 </p>
               ) : (
-                individuais.map((individual) => {
-                  const integrante = integrantes.find(
-                    (i) => i.pessoaId === individual.id,
-                  );
-                  const marcado = !!integrante;
-                  const percentual =
-                    marcado && somaPesos > 0
-                      ? ((integrante.peso / somaPesos) * 100).toFixed(0)
-                      : null;
-                  return (
-                    <div
-                      key={individual.id}
-                      className="flex items-center gap-2 text-sm"
+                <>
+                  {individuais.map((individual) => {
+                    const integrante = integrantes.find(
+                      (i) => i.pessoaId === individual.id,
+                    );
+                    const marcado = !!integrante;
+                    return (
+                      <div
+                        key={individual.id}
+                        className="flex items-center gap-2 text-sm"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={marcado}
+                          onChange={(e) =>
+                            alternarIntegrante(individual.id, e.target.checked)
+                          }
+                        />
+                        <span className="min-w-0 flex-1 truncate">
+                          {individual.nome}
+                        </span>
+                        {marcado && (
+                          <div className="flex items-center gap-1">
+                            <input
+                              type="number"
+                              min={1}
+                              max={100}
+                              step={1}
+                              title="% da divisão"
+                              className="border-outline-variant bg-surface-container-lowest w-16 rounded-lg border px-2 py-1 text-right text-xs"
+                              value={integrante.peso}
+                              onChange={(e) =>
+                                mudarPeso(
+                                  individual.id,
+                                  Number(e.target.value) || 1,
+                                )
+                              }
+                            />
+                            <span className="text-on-surface-variant text-xs">
+                              %
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                  {integrantes.length > 0 && (
+                    <span
+                      className={`text-xs ${somaPesos === 100 ? "text-on-surface-variant" : "text-danger"}`}
                     >
-                      <input
-                        type="checkbox"
-                        checked={marcado}
-                        onChange={(e) =>
-                          alternarIntegrante(individual.id, e.target.checked)
-                        }
-                      />
-                      <span className="min-w-0 flex-1 truncate">
-                        {individual.nome}
-                      </span>
-                      {marcado && (
-                        <>
-                          <input
-                            type="number"
-                            min={1}
-                            step={1}
-                            title="Peso"
-                            className="border-outline-variant bg-surface-container-lowest w-16 rounded-lg border px-2 py-1 text-xs"
-                            value={integrante.peso}
-                            onChange={(e) =>
-                              mudarPeso(
-                                individual.id,
-                                Number(e.target.value) || 1,
-                              )
-                            }
-                          />
-                          <span className="text-on-surface-variant w-10 text-right text-xs">
-                            {percentual}%
-                          </span>
-                        </>
-                      )}
-                    </div>
-                  );
-                })
+                      Total: {somaPesos}%
+                      {somaPesos !== 100 && " (deveria somar 100%)"}
+                    </span>
+                  )}
+                </>
               )}
             </div>
           )}

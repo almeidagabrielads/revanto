@@ -148,9 +148,8 @@ describe("buscarRelatorioAnual", () => {
     expect(labels).toEqual(["Compartilhado", "Gabi", "Isa"]);
 
     // A seção "Família" reflete o orçamento do casal (pessoaId nulo), mas o
-    // real considera todos os lançamentos do household no período — mesma
-    // semântica de buscarPlanejadoVsReal (só filtra lançamentos por pessoa
-    // quando pessoaId é informado e não nulo).
+    // real considera todos os lançamentos do household no período (pessoaId
+    // nulo = sem filtro, mesma semântica de buscarPlanejadoVsReal).
     const secaoFamilia = relatorio.planejadoVsReal.find(
       (s) => s.pessoaId === null,
     )!;
@@ -161,14 +160,17 @@ describe("buscarRelatorioAnual", () => {
       dentroDoPlanejado: false,
     });
 
+    // O real de Isa passa a incluir a fração dela no gasto do casal (50% de
+    // 200_000 = 100_000, já que Isa/Gabi têm peso igual) além do lançamento
+    // individual dela (40_000) -> 140_000.
     const secaoIsa = relatorio.planejadoVsReal.find(
       (s) => s.pessoaId === isa.id,
     )!;
     expect(secaoIsa.itens[0].meses[0]).toMatchObject({
       mes: 1,
       planejadoCentavos: 50_000,
-      realCentavos: 40_000,
-      dentroDoPlanejado: true,
+      realCentavos: 140_000,
+      dentroDoPlanejado: false,
     });
 
     // Resumo por categoria/subcategoria: soma de todos os lançamentos do ano.

@@ -176,3 +176,35 @@ export async function resolverPessoasEfetivas(
   if (!pessoa || pessoa.tipo === "INDIVIDUAL") return [pessoaId];
   return [pessoaId, ...pessoa.integrantes.map((i) => i.pessoaId)];
 }
+
+/**
+ * Para uma pessoa INDIVIDUAL, retorna a fração (0–1) que ela representa em
+ * cada grupo (CASAL/FAMILIA) do qual participa — peso dela sobre a soma dos
+ * pesos do grupo. Usado para atribuir a cada pessoa sua parte proporcional de
+ * um gasto lançado no grupo (ex.: "Gastos totais" de alguém = seus gastos
+ * diretos + a fração que lhe cabe dos gastos do grupo), o mesmo peso usado no
+ * acerto de contas (ver split.ts).
+ */
+export async function resolverFracaoPorGrupo(
+  prisma: PrismaClient,
+  householdId: string,
+  pessoaId: string,
+): Promise<Map<string, number>> {
+  const participacoes = await prisma.integranteGrupo.findMany({
+    where: { householdId, pessoaId },
+    select: {
+      grupoId: true,
+      peso: true,
+      grupo: { select: { integrantes: { select: { peso: true } } } },
+    },
+  });
+
+  const fracaoPorGrupo = new Map<string, number>();
+  for (const p of participacoes) {
+    const somaPesos = p.grupo.integrantes.reduce((s, i) => s + i.peso, 0);
+    if (somaPesos > 0) {
+      fracaoPorGrupo.set(p.grupoId, p.peso / somaPesos);
+    }
+  }
+  return fracaoPorGrupo;
+}
