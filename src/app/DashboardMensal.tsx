@@ -88,7 +88,10 @@ export function DashboardMensal({ ano, mes }: { ano: number; mes: number }) {
 
     Promise.all([
       fetch(`/api/relatorios/saldo?ano=${ano}${pessoaQuery}`),
-      fetch(`/api/relatorios/divisao?dataInicio=${inicio}&dataFim=${fim}`),
+      // Acumulado de todo o período registrado até o fim do mês selecionado
+      // (não só o mês em si) — dívidas de meses anteriores continuam
+      // aparecendo até serem quitadas.
+      fetch(`/api/relatorios/divisao?dataFim=${fim}`),
       fetch(`/api/relatorios/planejado-vs-real?ano=${ano}${pessoaQuery}`),
       fetch(`/api/lancamentos?dataInicio=${inicio}&dataFim=${fim}${pessoaQuery}`),
       fetch("/api/pessoas"),

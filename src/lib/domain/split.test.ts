@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  aplicarAcertosResolvidos,
   calcularSaldoDivisaoGrupo,
   type LancamentoParaDivisao,
   type ParticipanteDivisao,
@@ -480,5 +481,145 @@ describe("calcularSaldoDivisaoGrupo — split customizado por peso", () => {
     expect(saldoDe(saldo, CAIO)).toBe(0);
     expect(saldoDe(saldo, BIA)).toBe(-5_000);
     expect(saldoDe(saldo, ANA)).toBe(5_000);
+  });
+});
+
+describe("aplicarAcertosResolvidos", () => {
+  it("sem acertos resolvidos, retorna o saldo bruto sem alterações", () => {
+    const saldoBruto = calcularSaldoDivisaoGrupo(
+      [
+        lancamento({
+          valorCentavos: 10_000,
+          pessoaDivisaoId: "casal",
+          pessoaDivisaoTipo: "CASAL",
+          pessoaPagouId: ISA,
+        }),
+      ],
+      [ISA, GABI],
+      grupo("casal", [
+        { pessoaId: ISA, peso: 100 },
+        { pessoaId: GABI, peso: 100 },
+      ]),
+    );
+
+    const saldoLiquido = aplicarAcertosResolvidos(saldoBruto, []);
+
+    expect(saldoLiquido).toEqual(saldoBruto);
+  });
+
+  it("um pagamento já feito reduz a dívida de quem pagou e o crédito de quem recebeu", () => {
+    const saldoBruto = calcularSaldoDivisaoGrupo(
+      [
+        lancamento({
+          valorCentavos: 10_000,
+          pessoaDivisaoId: "casal",
+          pessoaDivisaoTipo: "CASAL",
+          pessoaPagouId: ISA,
+        }),
+      ],
+      [ISA, GABI],
+      grupo("casal", [
+        { pessoaId: ISA, peso: 100 },
+        { pessoaId: GABI, peso: 100 },
+      ]),
+    );
+    // Bruto: Gabi deve 5.000 a Isa.
+
+    // Gabi já pagou 5.000 a Isa (acerto resolvido) -> nada mais pendente.
+    const saldoLiquido = aplicarAcertosResolvidos(saldoBruto, [
+      { deId: GABI, paraId: ISA, valorCentavos: 5_000 },
+    ]);
+
+    expect(saldoDe(saldoLiquido, ISA)).toBe(0);
+    expect(saldoDe(saldoLiquido, GABI)).toBe(0);
+    expect(saldoLiquido.transferenciasSugeridas).toEqual([]);
+  });
+
+  it("um acerto resolvido que não cobre o valor bruto deixa o restante pendente", () => {
+    const saldoBruto = calcularSaldoDivisaoGrupo(
+      [
+        lancamento({
+          valorCentavos: 20_000,
+          pessoaDivisaoId: "casal",
+          pessoaDivisaoTipo: "CASAL",
+          pessoaPagouId: ISA,
+        }),
+      ],
+      [ISA, GABI],
+      grupo("casal", [
+        { pessoaId: ISA, peso: 100 },
+        { pessoaId: GABI, peso: 100 },
+      ]),
+    );
+    // Bruto: Gabi deve 10.000 a Isa.
+
+    // Gabi já pagou só 4.000 -> ainda deve 6.000.
+    const saldoLiquido = aplicarAcertosResolvidos(saldoBruto, [
+      { deId: GABI, paraId: ISA, valorCentavos: 4_000 },
+    ]);
+
+    expect(saldoDe(saldoLiquido, GABI)).toBe(-6_000);
+    expect(saldoDe(saldoLiquido, ISA)).toBe(6_000);
+    expect(saldoLiquido.transferenciasSugeridas).toEqual([
+      { deId: GABI, paraId: ISA, valorCentavos: 6_000 },
+    ]);
+  });
+
+  it("um pagamento maior que o saldo bruto inverte quem deve a quem", () => {
+    const saldoBruto = calcularSaldoDivisaoGrupo(
+      [
+        lancamento({
+          valorCentavos: 10_000,
+          pessoaDivisaoId: "casal",
+          pessoaDivisaoTipo: "CASAL",
+          pessoaPagouId: ISA,
+        }),
+      ],
+      [ISA, GABI],
+      grupo("casal", [
+        { pessoaId: ISA, peso: 100 },
+        { pessoaId: GABI, peso: 100 },
+      ]),
+    );
+    // Bruto: Gabi deve 5.000 a Isa.
+
+    // Gabi pagou 8.000 (mais do que devia, ex.: cobria também um período
+    // anterior recalculado depois) -> agora Isa deve 3.000 a Gabi.
+    const saldoLiquido = aplicarAcertosResolvidos(saldoBruto, [
+      { deId: GABI, paraId: ISA, valorCentavos: 8_000 },
+    ]);
+
+    expect(saldoDe(saldoLiquido, ISA)).toBe(-3_000);
+    expect(saldoDe(saldoLiquido, GABI)).toBe(3_000);
+    expect(saldoLiquido.transferenciasSugeridas).toEqual([
+      { deId: ISA, paraId: GABI, valorCentavos: 3_000 },
+    ]);
+  });
+
+  it("combina múltiplos acertos resolvidos", () => {
+    const saldoBruto = calcularSaldoDivisaoGrupo(
+      [
+        lancamento({
+          valorCentavos: 30_000,
+          pessoaDivisaoId: "casal",
+          pessoaDivisaoTipo: "CASAL",
+          pessoaPagouId: ISA,
+        }),
+      ],
+      [ISA, GABI],
+      grupo("casal", [
+        { pessoaId: ISA, peso: 100 },
+        { pessoaId: GABI, peso: 100 },
+      ]),
+    );
+    // Bruto: Gabi deve 15.000 a Isa.
+
+    const saldoLiquido = aplicarAcertosResolvidos(saldoBruto, [
+      { deId: GABI, paraId: ISA, valorCentavos: 5_000 },
+      { deId: GABI, paraId: ISA, valorCentavos: 5_000 },
+    ]);
+
+    expect(saldoDe(saldoLiquido, GABI)).toBe(-5_000);
+    expect(saldoDe(saldoLiquido, ISA)).toBe(5_000);
   });
 });
