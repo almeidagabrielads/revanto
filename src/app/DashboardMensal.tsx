@@ -25,16 +25,6 @@ type SaldoDivisaoGrupo = {
   transferenciasSugeridas: Transferencia[];
 };
 
-type LiquidezFaixa = {
-  faixa: string;
-  totalCentavos: number;
-};
-
-type PosicaoPatrimonio = {
-  mes: string;
-  valorCentavos: number;
-};
-
 type MesPlanejadoVsReal = {
   mes: number;
   planejadoCentavos: number;
@@ -75,35 +65,10 @@ function primeiroEUltimoDiaDoMes(
   return { inicio, fim };
 }
 
-function agruparPatrimonioPorMes(posicoes: PosicaoPatrimonio[]): {
-  atual: number;
-  anterior: number | null;
-} {
-  const totaisPorMes = new Map<string, number>();
-  for (const posicao of posicoes) {
-    const chave = posicao.mes.slice(0, 7);
-    totaisPorMes.set(
-      chave,
-      (totaisPorMes.get(chave) ?? 0) + posicao.valorCentavos,
-    );
-  }
-  const chavesOrdenadas = [...totaisPorMes.keys()].sort();
-  const chaveAtual = chavesOrdenadas.at(-1);
-  const chaveAnterior = chavesOrdenadas.at(-2);
-  return {
-    atual: chaveAtual ? (totaisPorMes.get(chaveAtual) ?? 0) : 0,
-    anterior: chaveAnterior ? (totaisPorMes.get(chaveAnterior) ?? 0) : null,
-  };
-}
-
 export function DashboardMensal({ ano, mes }: { ano: number; mes: number }) {
   const [saldo, setSaldo] = useState<SaldoAnual | null>(null);
   const [divisao, setDivisao] = useState<SaldoDivisaoGrupo | null>(null);
   const [divisaoCarregada, setDivisaoCarregada] = useState(false);
-  const [liquidez, setLiquidez] = useState<LiquidezFaixa[] | null>(null);
-  const [patrimonio, setPatrimonio] = useState<PosicaoPatrimonio[] | null>(
-    null,
-  );
   const [orcamento, setOrcamento] = useState<PlanejadoVsRealCategoria[] | null>(
     null,
   );
@@ -120,8 +85,6 @@ export function DashboardMensal({ ano, mes }: { ano: number; mes: number }) {
     Promise.all([
       fetch(`/api/relatorios/saldo?ano=${ano}`),
       fetch(`/api/relatorios/divisao?dataInicio=${inicio}&dataFim=${fim}`),
-      fetch("/api/investimentos/liquidez"),
-      fetch(`/api/patrimonio?ano=${ano}`),
       fetch(`/api/relatorios/planejado-vs-real?ano=${ano}`),
       fetch(`/api/lancamentos?dataInicio=${inicio}&dataFim=${fim}`),
       fetch("/api/pessoas"),
@@ -132,8 +95,6 @@ export function DashboardMensal({ ano, mes }: { ano: number; mes: number }) {
         const [
           saldoRes,
           divisaoRes,
-          liquidezRes,
-          patrimonioRes,
           orcamentoRes,
           lancamentosRes,
           pessoasRes,
@@ -142,8 +103,6 @@ export function DashboardMensal({ ano, mes }: { ano: number; mes: number }) {
 
         if (
           saldoRes.status === 401 ||
-          liquidezRes.status === 401 ||
-          patrimonioRes.status === 401 ||
           orcamentoRes.status === 401 ||
           lancamentosRes.status === 401 ||
           pessoasRes.status === 401 ||
@@ -154,8 +113,6 @@ export function DashboardMensal({ ano, mes }: { ano: number; mes: number }) {
         }
 
         setSaldo(saldoRes.ok ? await saldoRes.json() : null);
-        setLiquidez(liquidezRes.ok ? await liquidezRes.json() : []);
-        setPatrimonio(patrimonioRes.ok ? await patrimonioRes.json() : []);
         setOrcamento(
           unicosPorChave(
             orcamentoRes.ok ? await orcamentoRes.json() : [],
@@ -203,22 +160,6 @@ export function DashboardMensal({ ano, mes }: { ano: number; mes: number }) {
     categorias.find((c) => c.id === id)?.nome ?? "Sem categoria";
 
   const saldoDoMes = saldo?.porMes.find((m) => m.mes === mes) ?? null;
-  const investimentosCentavos = (liquidez ?? []).reduce(
-    (soma, f) => soma + f.totalCentavos,
-    0,
-  );
-  const {
-    atual: patrimonioAtualCentavos,
-    anterior: patrimonioAnteriorCentavos,
-  } = agruparPatrimonioPorMes(patrimonio ?? []);
-  const ativosLiquidosCentavos =
-    patrimonioAtualCentavos - investimentosCentavos;
-  const variacaoPercentual =
-    patrimonioAnteriorCentavos && patrimonioAnteriorCentavos !== 0
-      ? ((patrimonioAtualCentavos - patrimonioAnteriorCentavos) /
-        Math.abs(patrimonioAnteriorCentavos)) *
-      100
-      : null;
 
   const categoriasOrcamento = (orcamento ?? [])
     .map((c) => ({
@@ -228,7 +169,18 @@ export function DashboardMensal({ ano, mes }: { ano: number; mes: number }) {
         realCentavos: 0,
       }),
     }))
-    .filter((c) => c.planejadoCentavos > 0 || c.realCentavos > 0);
+    .filter((c) => c.planejadoCentavos > 0 || c.realCentavos > 0)
+    .sort((a, b) => {
+      const percentualA =
+        a.planejadoCentavos > 0
+          ? a.realCentavos / a.planejadoCentavos
+          : Infinity;
+      const percentualB =
+        b.planejadoCentavos > 0
+          ? b.realCentavos / b.planejadoCentavos
+          : Infinity;
+      return percentualB - percentualA;
+    });
   const totalPlanejadoCentavos = categoriasOrcamento.reduce(
     (soma, c) => soma + c.planejadoCentavos,
     0,
@@ -256,40 +208,24 @@ export function DashboardMensal({ ano, mes }: { ano: number; mes: number }) {
 
       <div className="gap-md grid grid-cols-1 lg:grid-cols-3">
         <div className={`${cardClass} lg:col-span-2`}>
-          <div className="gap-md flex items-start justify-between">
-            <h2 className={cardTitleClass}>Patrimônio consolidado</h2>
-            {variacaoPercentual !== null && (
-              <span
-                className={`px-sm rounded-full py-0.5 text-xs font-semibold ${variacaoPercentual >= 0
-                    ? "bg-success/15 text-success"
-                    : "bg-danger-container text-on-danger-container"
-                  }`}
-              >
-                {variacaoPercentual >= 0 ? "↗" : "↘"}{" "}
-                {Math.abs(variacaoPercentual).toFixed(1)}% este mês
-              </span>
-            )}
-          </div>
-          <p className="data-tabular text-on-surface text-3xl font-semibold">
-            {centavosParaReais(patrimonioAtualCentavos)}
-          </p>
-          <div className="gap-sm border-outline-variant pt-md grid grid-cols-1 border-t sm:grid-cols-3">
+          <h2 className={cardTitleClass}>Resumo do mês</h2>
+          <div className="gap-sm grid grid-cols-1 sm:grid-cols-3">
             <div>
-              <p className="text-on-surface-variant text-xs">Ativos líquidos</p>
-              <p className="data-tabular text-on-surface font-semibold">
-                {centavosParaReais(ativosLiquidosCentavos)}
+              <p className="text-on-surface-variant text-xs">Receita total</p>
+              <p className="data-tabular text-on-surface text-2xl font-semibold">
+                {saldoDoMes ? centavosParaReais(saldoDoMes.receitaCentavos) : "—"}
               </p>
             </div>
             <div>
-              <p className="text-on-surface-variant text-xs">Investimentos</p>
-              <p className="data-tabular text-on-surface font-semibold">
-                {centavosParaReais(investimentosCentavos)}
+              <p className="text-on-surface-variant text-xs">Gastos totais</p>
+              <p className="data-tabular text-on-surface text-2xl font-semibold">
+                {saldoDoMes ? centavosParaReais(saldoDoMes.despesaCentavos) : "—"}
               </p>
             </div>
             <div>
               <p className="text-on-surface-variant text-xs">Saldo do mês</p>
               <p
-                className={`data-tabular font-semibold ${saldoDoMes && saldoDoMes.saldoCentavos < 0
+                className={`data-tabular text-2xl font-semibold ${saldoDoMes && saldoDoMes.saldoCentavos < 0
                     ? "text-danger"
                     : "text-on-surface"
                   }`}
