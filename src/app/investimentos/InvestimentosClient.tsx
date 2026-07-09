@@ -695,40 +695,6 @@ export function InvestimentosClient() {
         </div>
       )}
 
-      {aba === "CARTEIRA" && (
-        <div className={cardClass}>
-          <div className="p-lg pb-md">
-            <h2 className="text-on-surface text-base font-bold">
-              Liquidez consolidada (RF15)
-            </h2>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full border-collapse text-sm">
-              <thead>
-                <tr className="border-outline-variant text-on-surface-variant border-y text-xs font-semibold tracking-wide uppercase">
-                  <th className="p-md text-left">Prazo de resgate</th>
-                  <th className="p-md text-right">Total disponível</th>
-                </tr>
-              </thead>
-              <tbody>
-                {liquidez?.map((grupo) => (
-                  <tr
-                    key={grupo.faixa}
-                    className="border-outline-variant/60 hover:bg-surface-container-low border-b"
-                  >
-                    <td className="p-md text-on-surface-variant">
-                      {FAIXAS_LABEL[grupo.faixa] ?? grupo.faixa}
-                    </td>
-                    <td className="data-tabular p-md text-right font-medium">
-                      {formatarReais(grupo.totalCentavos)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
