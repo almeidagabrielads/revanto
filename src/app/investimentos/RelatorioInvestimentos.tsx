@@ -31,6 +31,10 @@ type GrupoAlocacao = {
   label: string;
   cor: string;
   totalCentavos: number;
+  // Rótulos originais agregados nesta fatia — normalmente só o próprio
+  // label, mas o bucket "Outros" reúne vários (usado para filtrar a
+  // Carteira por todos eles ao clicar).
+  itens: string[];
 };
 
 function agruparComCores(
@@ -41,16 +45,21 @@ function agruparComCores(
     .sort((a, b) => b.totalCentavos - a.totalCentavos);
 
   if (ordenados.length <= PALETTE_CATEGORICA.length) {
-    return ordenados.map((g, i) => ({ ...g, cor: PALETTE_CATEGORICA[i] }));
+    return ordenados.map((g, i) => ({
+      ...g,
+      cor: PALETTE_CATEGORICA[i],
+      itens: [g.label],
+    }));
   }
 
   const limite = PALETTE_CATEGORICA.length - 1;
-  const principais = ordenados
-    .slice(0, limite)
-    .map((g, i) => ({ ...g, cor: PALETTE_CATEGORICA[i] }));
-  const totalOutros = ordenados
-    .slice(limite)
-    .reduce((soma, g) => soma + g.totalCentavos, 0);
+  const principais = ordenados.slice(0, limite).map((g, i) => ({
+    ...g,
+    cor: PALETTE_CATEGORICA[i],
+    itens: [g.label],
+  }));
+  const resto = ordenados.slice(limite);
+  const totalOutros = resto.reduce((soma, g) => soma + g.totalCentavos, 0);
 
   return [
     ...principais,
@@ -59,6 +68,7 @@ function agruparComCores(
       label: "Outros",
       totalCentavos: totalOutros,
       cor: COR_OUTROS,
+      itens: resto.map((g) => g.label),
     },
   ];
 }
@@ -97,7 +107,16 @@ function labelTipo(tipo: string): string {
   return TIPOS_INVESTIMENTO.find((t) => t.value === tipo)?.label ?? tipo;
 }
 
-function Donut({ fatias }: { fatias: { cor: string; valor: number }[] }) {
+function Donut({
+  fatias,
+}: {
+  fatias: {
+    cor: string;
+    valor: number;
+    titulo?: string;
+    onClick?: () => void;
+  }[];
+}) {
   const total = fatias.reduce((soma, f) => soma + f.valor, 0);
   const raio = 60;
   const circunferencia = 2 * Math.PI * raio;
@@ -132,7 +151,11 @@ function Donut({ fatias }: { fatias: { cor: string; valor: number }[] }) {
                 strokeWidth={20}
                 strokeDasharray={`${comprimento} ${circunferencia - comprimento}`}
                 strokeDashoffset={offset}
-              />
+                onClick={f.onClick}
+                className={f.onClick ? "cursor-pointer" : undefined}
+              >
+                {f.titulo && <title>{f.titulo}</title>}
+              </circle>
             );
           })}
     </svg>
@@ -142,9 +165,11 @@ function Donut({ fatias }: { fatias: { cor: string; valor: number }[] }) {
 function AlocacaoCard({
   titulo,
   grupos,
+  onSelecionar,
 }: {
   titulo: string;
   grupos: GrupoAlocacao[];
+  onSelecionar?: (grupo: GrupoAlocacao) => void;
 }) {
   return (
     <section className="gap-md border-outline-variant bg-surface-container-lowest p-lg flex flex-col rounded-xl border shadow-sm">
@@ -156,17 +181,36 @@ function AlocacaoCard({
               fatias={grupos.map((g) => ({
                 cor: g.cor,
                 valor: g.totalCentavos,
+                titulo: `${g.label}: ${formatarReais(g.totalCentavos)}`,
+                onClick: onSelecionar ? () => onSelecionar(g) : undefined,
               }))}
             />
           </div>
           <ul className="flex flex-col gap-2">
             {grupos.map((g) => (
               <li key={g.chave} className="flex items-center gap-2 text-sm">
-                <span
-                  className="h-2.5 w-2.5 rounded-full"
-                  style={{ backgroundColor: g.cor }}
-                />
-                <span className="text-on-surface-variant">{g.label}</span>
+                {onSelecionar ? (
+                  <button
+                    type="button"
+                    onClick={() => onSelecionar(g)}
+                    title={`Ver na Carteira: ${g.label}`}
+                    className="flex flex-1 cursor-pointer items-center gap-2 rounded-lg text-left hover:underline"
+                  >
+                    <span
+                      className="h-2.5 w-2.5 shrink-0 rounded-full"
+                      style={{ backgroundColor: g.cor }}
+                    />
+                    <span className="text-on-surface-variant">{g.label}</span>
+                  </button>
+                ) : (
+                  <>
+                    <span
+                      className="h-2.5 w-2.5 rounded-full"
+                      style={{ backgroundColor: g.cor }}
+                    />
+                    <span className="text-on-surface-variant">{g.label}</span>
+                  </>
+                )}
                 <span className="data-tabular text-on-surface ml-auto font-medium">
                   {formatarReais(g.totalCentavos)}
                 </span>
@@ -242,10 +286,15 @@ export function RelatorioInvestimentos({
   investimentos,
   bancos,
   pessoas,
+  onFiltrarCarteira,
 }: {
   investimentos: Investimento[];
   bancos: Banco[];
   pessoas: Pessoa[];
+  onFiltrarCarteira?: (
+    chave: "tipo" | "banco" | "titular",
+    valores: string[],
+  ) => void;
 }) {
   const anoAtual = new Date().getUTCFullYear();
   const [ano, setAno] = useState(anoAtual);
@@ -302,6 +351,7 @@ export function RelatorioInvestimentos({
         label: g.label,
         cor: g.cor,
         totalCentavos: g.totalCentavos,
+        itens: [g.label],
       })),
     [grupos],
   );
@@ -427,9 +477,33 @@ export function RelatorioInvestimentos({
       </div>
 
       <div className="gap-lg grid grid-cols-1 md:grid-cols-3">
-        <AlocacaoCard titulo="Alocação por Classe" grupos={gruposClasse} />
-        <AlocacaoCard titulo="Alocação por Banco" grupos={gruposBanco} />
-        <AlocacaoCard titulo="Alocação por Titular" grupos={gruposTitular} />
+        <AlocacaoCard
+          titulo="Alocação por Classe"
+          grupos={gruposClasse}
+          onSelecionar={
+            onFiltrarCarteira
+              ? (g) => onFiltrarCarteira("tipo", g.itens)
+              : undefined
+          }
+        />
+        <AlocacaoCard
+          titulo="Alocação por Banco"
+          grupos={gruposBanco}
+          onSelecionar={
+            onFiltrarCarteira
+              ? (g) => onFiltrarCarteira("banco", g.itens)
+              : undefined
+          }
+        />
+        <AlocacaoCard
+          titulo="Alocação por Titular"
+          grupos={gruposTitular}
+          onSelecionar={
+            onFiltrarCarteira
+              ? (g) => onFiltrarCarteira("titular", g.itens)
+              : undefined
+          }
+        />
       </div>
 
       <section className="gap-md border-outline-variant bg-surface-container-lowest p-lg flex flex-col rounded-xl border shadow-sm">

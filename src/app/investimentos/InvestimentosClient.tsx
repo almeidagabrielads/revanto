@@ -369,6 +369,14 @@ export function InvestimentosClient() {
     limparFiltro,
   } = useTabela(investimentos ?? [], colunasInvestimentos);
 
+  function irParaCarteiraFiltrada(
+    chave: "tipo" | "banco" | "titular",
+    valores: string[],
+  ) {
+    setAba("CARTEIRA");
+    definirFiltro(chave, { tipo: "opcoes", selecionadas: valores });
+  }
+
   const opcoesColunasInvestimentos = useMemo(() => {
     const base = investimentos ?? [];
     const unicos = (valores: string[]) =>
@@ -457,6 +465,7 @@ export function InvestimentosClient() {
           investimentos={investimentos ?? []}
           bancos={bancos}
           pessoas={pessoas}
+          onFiltrarCarteira={irParaCarteiraFiltrada}
         />
       )}
 
