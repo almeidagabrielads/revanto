@@ -8,6 +8,7 @@ import { EditarInvestimentoModal } from "./EditarInvestimentoModal";
 import { useConfirmDialog } from "../components/ConfirmDialog";
 import { ColumnHeader } from "../components/ColumnHeader";
 import { useTabela, type ColunaTabela } from "../components/useTabela";
+import { filtroEstaAtivo } from "@/lib/domain/tabela";
 
 export const TIPOS_INVESTIMENTO = [
   { value: "RENDA_FIXA", label: "Renda Fixa" },
@@ -367,7 +368,10 @@ export function InvestimentosClient() {
     filtros,
     definirFiltro,
     limparFiltro,
+    limparTodosFiltros,
   } = useTabela(investimentos ?? [], colunasInvestimentos);
+
+  const algumFiltroAtivo = Object.values(filtros).some(filtroEstaAtivo);
 
   function irParaCarteiraFiltrada(
     chave: "tipo" | "banco" | "titular",
@@ -690,6 +694,15 @@ export function InvestimentosClient() {
               </span>
             </div>
             <div className="gap-md flex items-center">
+              {algumFiltroAtivo && (
+                <button
+                  type="button"
+                  onClick={limparTodosFiltros}
+                  className="text-primary hover:bg-primary-container rounded-full px-3 py-1 text-xs font-semibold transition-colors"
+                >
+                  Limpar filtros
+                </button>
+              )}
               <label className="gap-1.5 text-on-surface-variant flex cursor-pointer items-center text-xs font-semibold">
                 <input
                   type="checkbox"
