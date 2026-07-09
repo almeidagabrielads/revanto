@@ -444,7 +444,11 @@ export function RelatorioInvestimentos({
 
   const colunasInvestimentos = useMemo<ColunaTabela<Investimento>[]>(
     () => [
-      { chave: "classe", tipo: "opcoes", acessor: (inv) => labelTipo(inv.tipo) },
+      {
+        chave: "classe",
+        tipo: "opcoes",
+        acessor: (inv) => labelTipo(inv.tipo),
+      },
       {
         chave: "instituicao",
         tipo: "opcoes",
@@ -528,7 +532,7 @@ export function RelatorioInvestimentos({
         </span>
       </div>
 
-      <div className="gap-lg grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="gap-lg grid grid-cols-1 md:grid-cols-3">
         <AlocacaoCard
           titulo="Alocação por Classe"
           grupos={gruposClasse}
@@ -556,6 +560,9 @@ export function RelatorioInvestimentos({
               : undefined
           }
         />
+      </div>
+
+      <div className="gap-lg grid grid-cols-1 lg:grid-cols-[minmax(0,340px)_1fr]">
         <AlocacaoCard
           titulo="Liquidez de Resgate"
           grupos={gruposLiquidez}
@@ -565,56 +572,56 @@ export function RelatorioInvestimentos({
               : undefined
           }
         />
-      </div>
 
-      <section className="gap-md border-outline-variant bg-surface-container-lowest p-lg flex flex-col rounded-xl border shadow-sm">
-        <div className="flex items-center justify-between">
-          <h2 className="text-on-surface text-base font-bold">
-            Performance: Rendimento vs. CDI
-          </h2>
-          <div className="gap-md text-on-surface-variant flex items-center text-xs">
-            <span className="flex items-center gap-1">
-              <span className="bg-primary h-2 w-2 rounded-full" /> Carteira
-            </span>
-            <span className="flex items-center gap-1">
-              <span className="bg-outline h-2 w-2 rounded-full" /> CDI
-            </span>
-          </div>
-        </div>
-        {rendimento === null ? (
-          <p className="text-on-surface-variant text-sm">Carregando…</p>
-        ) : rendimento.length > 0 ? (
-          <>
-            <GraficoRendimento linhas={rendimento} />
-            <div className="text-on-surface-variant flex justify-between text-xs">
-              {rendimento.map((l) => (
-                <span key={l.mes}>
-                  {new Date(l.mes).toLocaleDateString("pt-BR", {
-                    month: "short",
-                    timeZone: "UTC",
-                  })}
-                </span>
-              ))}
+        <section className="gap-md border-outline-variant bg-surface-container-lowest p-lg flex flex-col rounded-xl border shadow-sm">
+          <div className="flex items-center justify-between">
+            <h2 className="text-on-surface text-base font-bold">
+              Performance: Rendimento vs. CDI
+            </h2>
+            <div className="gap-md text-on-surface-variant flex items-center text-xs">
+              <span className="flex items-center gap-1">
+                <span className="bg-primary h-2 w-2 rounded-full" /> Carteira
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="bg-outline h-2 w-2 rounded-full" /> CDI
+              </span>
             </div>
-            {ultimaLinha && (
-              <p className="text-on-surface-variant text-sm">
-                Acumulado no ano: carteira{" "}
-                <span className="text-on-surface font-semibold">
-                  {ultimaLinha.rendimentoAcumuladoRealPercentual.toFixed(2)}%
-                </span>{" "}
-                vs. CDI{" "}
-                <span className="text-on-surface font-semibold">
-                  {ultimaLinha.cdiAcumuladoPercentual.toFixed(2)}%
-                </span>
-              </p>
-            )}
-          </>
-        ) : (
-          <p className="text-on-surface-variant text-sm">
-            Sem posições de patrimônio lançadas em {ano}.
-          </p>
-        )}
-      </section>
+          </div>
+          {rendimento === null ? (
+            <p className="text-on-surface-variant text-sm">Carregando…</p>
+          ) : rendimento.length > 0 ? (
+            <>
+              <GraficoRendimento linhas={rendimento} />
+              <div className="text-on-surface-variant flex justify-between text-xs">
+                {rendimento.map((l) => (
+                  <span key={l.mes}>
+                    {new Date(l.mes).toLocaleDateString("pt-BR", {
+                      month: "short",
+                      timeZone: "UTC",
+                    })}
+                  </span>
+                ))}
+              </div>
+              {ultimaLinha && (
+                <p className="text-on-surface-variant text-sm">
+                  Acumulado no ano: carteira{" "}
+                  <span className="text-on-surface font-semibold">
+                    {ultimaLinha.rendimentoAcumuladoRealPercentual.toFixed(2)}%
+                  </span>{" "}
+                  vs. CDI{" "}
+                  <span className="text-on-surface font-semibold">
+                    {ultimaLinha.cdiAcumuladoPercentual.toFixed(2)}%
+                  </span>
+                </p>
+              )}
+            </>
+          ) : (
+            <p className="text-on-surface-variant text-sm">
+              Sem posições de patrimônio lançadas em {ano}.
+            </p>
+          )}
+        </section>
+      </div>
 
       <section className="gap-sm border-outline-variant bg-surface-container-lowest p-lg flex flex-col rounded-xl border shadow-sm">
         <h2 className="text-on-surface text-base font-bold">
