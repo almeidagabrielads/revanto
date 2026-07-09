@@ -70,39 +70,39 @@ model AtividadeLog {
 }
 
 model Pessoa {
-  id                        String               @id @default(cuid())
-  nome                      String
-  tipo                      TipoPessoa
-  householdId               String
-  createdAt                 DateTime             @default(now())
-  updatedAt                 DateTime             @updatedAt
-  acertosDevidos            AcertoContas[]       @relation("AcertoDe")
-  acertosRecebidos          AcertoContas[]       @relation("AcertoPara")
-  investimentos             Investimento[]
-  lancamentosDivisao        Lancamento[]         @relation("LancamentoDivisao")
-  lancamentosPagou          Lancamento[]         @relation("LancamentoPagou")
-  orcamentos                OrcamentoPlanejado[]
-  household                 Household            @relation(fields: [householdId], references: [id])
-  posicoesPatrimonio        PosicaoPatrimonio[]
-  receitas                  Receita[]
-  integrantesDoGrupo        IntegranteGrupo[]    @relation("IntegranteGrupo_grupoIdToPessoa")
-  participacoesComoIntegrante IntegranteGrupo[]  @relation("IntegranteGrupo_pessoaIdToPessoa")
+  id                          String               @id @default(cuid())
+  nome                        String
+  tipo                        TipoPessoa
+  householdId                 String
+  createdAt                   DateTime             @default(now())
+  updatedAt                   DateTime             @updatedAt
+  acertosDevidos              AcertoContas[]       @relation("AcertoDe")
+  acertosRecebidos            AcertoContas[]       @relation("AcertoPara")
+  investimentos               Investimento[]
+  lancamentosDivisao          Lancamento[]         @relation("LancamentoDivisao")
+  lancamentosPagou            Lancamento[]         @relation("LancamentoPagou")
+  orcamentos                  OrcamentoPlanejado[]
+  household                   Household            @relation(fields: [householdId], references: [id])
+  posicoesPatrimonio          PosicaoPatrimonio[]
+  receitas                    Receita[]
+  integrantesDoGrupo          IntegranteGrupo[]    @relation("IntegranteGrupo_grupoIdToPessoa")
+  participacoesComoIntegrante IntegranteGrupo[]    @relation("IntegranteGrupo_pessoaIdToPessoa")
 
   @@unique([householdId, nome])
 }
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model IntegranteGrupo {
-  id                                      String    @id @default(cuid())
-  grupoId                                 String
-  pessoaId                                String
-  peso                                    Int       @default(100)
-  householdId                             String
-  createdAt                               DateTime  @default(now())
-  updatedAt                               DateTime  @updatedAt
-  grupo                                   Pessoa    @relation("IntegranteGrupo_grupoIdToPessoa", fields: [grupoId], references: [id], onDelete: Cascade)
-  household                               Household @relation(fields: [householdId], references: [id])
-  pessoa                                  Pessoa    @relation("IntegranteGrupo_pessoaIdToPessoa", fields: [pessoaId], references: [id], onDelete: Cascade)
+  id          String    @id @default(cuid())
+  grupoId     String
+  pessoaId    String
+  peso        Int       @default(100)
+  householdId String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  grupo       Pessoa    @relation("IntegranteGrupo_grupoIdToPessoa", fields: [grupoId], references: [id], onDelete: Cascade)
+  household   Household @relation(fields: [householdId], references: [id])
+  pessoa      Pessoa    @relation("IntegranteGrupo_pessoaIdToPessoa", fields: [pessoaId], references: [id], onDelete: Cascade)
 
   @@unique([grupoId, pessoaId])
   @@index([householdId])
@@ -175,35 +175,39 @@ model Banco {
 }
 
 model Lancamento {
-  id               String        @id @default(cuid())
-  data             DateTime      @db.Date
-  descricaoOrigem  String?
-  descricaoPropria String?
-  valorCentavos    Int
-  descontoCentavos Int           @default(0)
-  categoriaId      String?
-  subcategoriaId   String?
-  bancoId          String
-  pessoaDivisaoId  String
-  pessoaPagouId    String
-  householdId      String
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
-  createdByUserId  String?
-  updatedByUserId  String?
-  hashImportacao   String?
-  banco            Banco         @relation(fields: [bancoId], references: [id])
-  categoria        Categoria?    @relation(fields: [categoriaId], references: [id])
-  household        Household     @relation(fields: [householdId], references: [id])
-  pessoaDivisao    Pessoa        @relation("LancamentoDivisao", fields: [pessoaDivisaoId], references: [id])
-  pessoaPagou      Pessoa        @relation("LancamentoPagou", fields: [pessoaPagouId], references: [id])
-  subcategoria     Subcategoria? @relation(fields: [subcategoriaId], references: [id])
+  id                         String        @id @default(cuid())
+  data                       DateTime      @db.Date
+  descricaoOrigem            String?
+  descricaoPropria           String?
+  valorCentavos              Int
+  descontoCentavos           Int           @default(0)
+  categoriaId                String?
+  subcategoriaId             String?
+  bancoId                    String
+  pessoaDivisaoId            String
+  pessoaPagouId              String
+  householdId                String
+  createdAt                  DateTime      @default(now())
+  updatedAt                  DateTime      @updatedAt
+  createdByUserId            String?
+  updatedByUserId            String?
+  hashImportacao             String?
+  pagoComResgateInvestimento Boolean       @default(false)
+  investimentoResgateId      String?
+  banco                      Banco         @relation(fields: [bancoId], references: [id])
+  categoria                  Categoria?    @relation(fields: [categoriaId], references: [id])
+  household                  Household     @relation(fields: [householdId], references: [id])
+  pessoaDivisao              Pessoa        @relation("LancamentoDivisao", fields: [pessoaDivisaoId], references: [id])
+  pessoaPagou                Pessoa        @relation("LancamentoPagou", fields: [pessoaPagouId], references: [id])
+  subcategoria               Subcategoria? @relation(fields: [subcategoriaId], references: [id])
+  investimentoResgate        Investimento? @relation(fields: [investimentoResgateId], references: [id])
 
   @@unique([householdId, hashImportacao])
   @@index([householdId, data])
   @@index([householdId, categoriaId])
   @@index([householdId, pessoaDivisaoId])
   @@index([householdId, pessoaPagouId])
+  @@index([householdId, investimentoResgateId])
 }
 
 model Receita {
@@ -269,6 +273,7 @@ model Investimento {
   reinvestimentos          Investimento[]        @relation("Reinvestimento")
   posicoesMensais          PosicaoInvestimento[]
   receitaResgate           Receita?              @relation("ResgateInvestimento")
+  lancamentosPagos         Lancamento[]
 
   @@index([householdId])
   @@index([householdId, pessoaId])

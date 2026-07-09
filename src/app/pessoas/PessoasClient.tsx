@@ -25,7 +25,7 @@ type Pessoa = {
   id: string;
   nome: string;
   tipo: TipoPessoa;
-  integrantes: Integrante[];
+  integrantesDoGrupo: Integrante[];
 };
 
 async function parseErro(response: Response): Promise<string> {
@@ -192,11 +192,11 @@ export function PessoasClient() {
     integrantes: Integrante[],
   ) {
     if (
-      pessoa.integrantes.length > 0 &&
+      pessoa.integrantesDoGrupo.length > 0 &&
       TIPOS_GRUPO.has(pessoa.tipo) &&
       !TIPOS_GRUPO.has(input.tipo) &&
       !(await confirmar(
-        `Mudar o tipo de "${pessoa.nome}" vai apagar a composição de grupo já cadastrada (${pessoa.integrantes.length} integrante(s)). Continuar?`,
+        `Mudar o tipo de "${pessoa.nome}" vai apagar a composição de grupo já cadastrada (${pessoa.integrantesDoGrupo.length} integrante(s)). Continuar?`,
       ))
     ) {
       return;
@@ -319,8 +319,8 @@ export function PessoasClient() {
 }
 
 function composicaoResumo(pessoa: Pessoa, pessoas: Pessoa[]): string {
-  const somaPesos = pessoa.integrantes.reduce((s, i) => s + i.peso, 0);
-  return pessoa.integrantes
+  const somaPesos = pessoa.integrantesDoGrupo.reduce((s, i) => s + i.peso, 0);
+  return pessoa.integrantesDoGrupo
     .map((i) => {
       const nome = pessoas.find((p) => p.id === i.pessoaId)?.nome ?? "—";
       const percentual = somaPesos > 0 ? (i.peso / somaPesos) * 100 : 0;
@@ -348,7 +348,7 @@ function PessoaItem({
   const [nome, setNome] = useState(pessoa.nome);
   const [tipo, setTipo] = useState<TipoPessoa>(pessoa.tipo);
   const [integrantes, setIntegrantes] = useState<Integrante[]>(
-    pessoa.integrantes,
+    pessoa.integrantesDoGrupo,
   );
 
   const individuais = pessoas.filter((p) => p.tipo === "INDIVIDUAL");
@@ -385,7 +385,7 @@ function PessoaItem({
   function cancelar() {
     setNome(pessoa.nome);
     setTipo(pessoa.tipo);
-    setIntegrantes(pessoa.integrantes);
+    setIntegrantes(pessoa.integrantesDoGrupo);
     setEditando(false);
   }
 
@@ -522,7 +522,7 @@ function PessoaItem({
               <span className="text-on-surface-variant text-xs font-semibold">
                 {labelTipo(pessoa.tipo)}
                 {TIPOS_GRUPO.has(pessoa.tipo) &&
-                  (pessoa.integrantes.length > 0 ? (
+                  (pessoa.integrantesDoGrupo.length > 0 ? (
                     <> · {composicaoResumo(pessoa, pessoas)}</>
                   ) : (
                     <span className="text-danger">

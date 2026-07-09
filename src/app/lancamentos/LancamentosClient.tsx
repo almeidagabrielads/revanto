@@ -12,6 +12,7 @@ type Categoria = { id: string; nome: string; subcategorias: Subcategoria[] };
 type Banco = { id: string; nome: string };
 type Pessoa = { id: string; nome: string; tipo: string };
 type Template = { id: string; nomeExibicao: string; descricao: string };
+type Investimento = { id: string; produto: string };
 
 type Lancamento = {
   id: string;
@@ -25,6 +26,8 @@ type Lancamento = {
   bancoId: string;
   pessoaDivisaoId: string;
   pessoaPagouId: string;
+  pagoComResgateInvestimento: boolean;
+  investimentoResgateId: string | null;
 };
 
 type LinhaPreview = {
@@ -88,6 +91,8 @@ type FormLancamento = {
   bancoId: string;
   pessoaDivisaoId: string;
   pessoaPagouId: string;
+  pagoComResgateInvestimento: boolean;
+  investimentoResgateId: string;
 };
 
 function formVazio(defaults: {
@@ -104,6 +109,8 @@ function formVazio(defaults: {
     bancoId: defaults.bancoId ?? "",
     pessoaDivisaoId: defaults.pessoaId ?? "",
     pessoaPagouId: defaults.pessoaId ?? "",
+    pagoComResgateInvestimento: false,
+    investimentoResgateId: "",
   };
 }
 
@@ -112,6 +119,7 @@ export function LancamentosClient() {
   const [bancos, setBancos] = useState<Banco[]>([]);
   const [pessoas, setPessoas] = useState<Pessoa[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
+  const [investimentos, setInvestimentos] = useState<Investimento[]>([]);
   const [lancamentos, setLancamentos] = useState<Lancamento[] | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [naoAutenticado, setNaoAutenticado] = useState(false);
@@ -141,6 +149,8 @@ export function LancamentosClient() {
   const [acoesEmMassaAberto, setAcoesEmMassaAberto] = useState(false);
   const [categoriaEmMassa, setCategoriaEmMassa] = useState("");
   const [paginaLancamentos, setPaginaLancamentos] = useState(0);
+  const [editandoId, setEditandoId] = useState<string | null>(null);
+  const [detalheId, setDetalheId] = useState<string | null>(null);
   const inputArquivoRef = useRef<HTMLInputElement>(null);
 
   function carregar() {
@@ -160,10 +170,19 @@ export function LancamentosClient() {
       fetch("/api/bancos").then((r) => (r.ok ? r.json() : null)),
       fetch("/api/pessoas").then((r) => (r.ok ? r.json() : null)),
       fetch("/api/importacao/templates").then((r) => (r.ok ? r.json() : null)),
+      fetch("/api/investimentos?incluirFinalizados=true").then((r) =>
+        r.ok ? r.json() : null,
+      ),
     ])
-      .then(([cats, bcs, pes, tpls]) => {
+      .then(([cats, bcs, pes, tpls, invs]) => {
         if (cancelado) return;
-        if (cats === null || bcs === null || pes === null || tpls === null) {
+        if (
+          cats === null ||
+          bcs === null ||
+          pes === null ||
+          tpls === null ||
+          invs === null
+        ) {
           setNaoAutenticado(true);
           return;
         }
@@ -172,6 +191,7 @@ export function LancamentosClient() {
         setBancos(bcs);
         setPessoas(pes);
         setTemplates(tpls);
+        setInvestimentos(invs);
         setForm((atual) =>
           atual.bancoId || atual.pessoaDivisaoId
             ? atual
@@ -249,25 +269,42 @@ export function LancamentosClient() {
 
   const colunasLancamentos = useMemo<ColunaTabela<Lancamento>[]>(
     () => [
-      { chave: "data", tipo: "data", acessor: (l) => dataParaInputDate(l.data) },
+      {
+        chave: "data",
+        tipo: "data",
+        acessor: (l) => dataParaInputDate(l.data),
+      },
       {
         chave: "descricao",
         tipo: "texto",
-        acessor: (l) => l.descricaoPropria ?? "",
+        acessor: (l) => l.descricaoPropria || l.descricaoOrigem || "",
       },
       {
         chave: "valor",
         tipo: "numero",
         acessor: (l) => (l.valorCentavos - l.descontoCentavos) / 100,
       },
-      { chave: "categoria", tipo: "opcoes", acessor: (l) => nome.categoria(l.categoriaId) },
+      {
+        chave: "categoria",
+        tipo: "opcoes",
+        acessor: (l) => nome.categoria(l.categoriaId),
+      },
+      {
+        chave: "subcategoria",
+        tipo: "opcoes",
+        acessor: (l) => nome.subcategoria(l.subcategoriaId),
+      },
       { chave: "banco", tipo: "opcoes", acessor: (l) => nome.banco(l.bancoId) },
       {
         chave: "divisao",
         tipo: "opcoes",
         acessor: (l) => nome.pessoa(l.pessoaDivisaoId),
       },
-      { chave: "pagou", tipo: "opcoes", acessor: (l) => nome.pessoa(l.pessoaPagouId) },
+      {
+        chave: "pagou",
+        tipo: "opcoes",
+        acessor: (l) => nome.pessoa(l.pessoaPagouId),
+      },
     ],
     [nome],
   );
@@ -281,12 +318,20 @@ export function LancamentosClient() {
     limparFiltro,
   } = useTabela(lancamentos ?? [], colunasLancamentos);
 
+  const lancamentoDetalhe = useMemo(
+    () => (lancamentos ?? []).find((l) => l.id === detalheId) ?? null,
+    [lancamentos, detalheId],
+  );
+
   const opcoesColunas = useMemo(() => {
     const base = lancamentos ?? [];
     const unicos = (valores: string[]) =>
       [...new Set(valores)].sort((a, b) => a.localeCompare(b, "pt-BR"));
     return {
       categoria: unicos(base.map((l) => nome.categoria(l.categoriaId))),
+      subcategoria: unicos(
+        base.map((l) => nome.subcategoria(l.subcategoriaId)),
+      ),
       banco: unicos(base.map((l) => nome.banco(l.bancoId))),
       divisao: unicos(base.map((l) => nome.pessoa(l.pessoaDivisaoId))),
       pagou: unicos(base.map((l) => nome.pessoa(l.pessoaPagouId))),
@@ -330,6 +375,8 @@ export function LancamentosClient() {
         bancoId: form.bancoId,
         pessoaDivisaoId: form.pessoaDivisaoId,
         pessoaPagouId: form.pessoaPagouId,
+        pagoComResgateInvestimento: form.pagoComResgateInvestimento,
+        investimentoResgateId: form.investimentoResgateId || null,
       }),
     });
     if (!response.ok) {
@@ -357,11 +404,13 @@ export function LancamentosClient() {
     carregar();
   }
 
-  async function removerLancamento(lancamento: Lancamento) {
+  async function removerLancamento(lancamento: Lancamento): Promise<boolean> {
     if (
-      !(await confirmar("Remover esse lançamento? Essa ação não pode ser desfeita."))
+      !(await confirmar(
+        "Remover esse lançamento? Essa ação não pode ser desfeita.",
+      ))
     ) {
-      return;
+      return false;
     }
     setErro(null);
     const response = await fetch(`/api/lancamentos/${lancamento.id}`, {
@@ -369,9 +418,10 @@ export function LancamentosClient() {
     });
     if (!response.ok) {
       setErro(await parseErro(response));
-      return;
+      return false;
     }
     carregar();
+    return true;
   }
 
   // ── Importação ────────────────────────────────────────────────────────
@@ -379,7 +429,9 @@ export function LancamentosClient() {
   async function processarArquivo(arquivo: File) {
     setErro(null);
     if (!importBancoId || !importTemplateId) {
-      setErro("Selecione o banco e o modelo de importação antes de enviar o arquivo.");
+      setErro(
+        "Selecione o banco e o modelo de importação antes de enviar o arquivo.",
+      );
       return;
     }
     setAnalisando(true);
@@ -506,17 +558,17 @@ export function LancamentosClient() {
     "rounded-lg border border-outline-variant bg-surface-container-lowest px-sm py-1.5 text-sm focus:border-primary focus:outline-none";
 
   return (
-    <div className="flex flex-col gap-lg">
+    <div className="gap-lg flex flex-col">
       {dialogConfirmacao}
 
       {toast && (
-        <div className="fixed bottom-lg right-lg z-50 flex items-center gap-2 rounded-xl bg-primary px-md py-2.5 text-sm font-medium text-on-primary shadow-lg">
+        <div className="bottom-lg right-lg bg-primary px-md text-on-primary fixed z-50 flex items-center gap-2 rounded-xl py-2.5 text-sm font-medium shadow-lg">
           <span aria-hidden>✓</span> {toast}
         </div>
       )}
 
       {erro && (
-        <p className="rounded-lg border border-danger/30 bg-danger-container p-sm text-sm text-on-danger-container">
+        <p className="border-danger/30 bg-danger-container p-sm text-on-danger-container rounded-lg border text-sm">
           {erro}
         </p>
       )}
@@ -525,25 +577,28 @@ export function LancamentosClient() {
         <button
           type="button"
           onClick={() => setMostrarFiltros((v) => !v)}
-          className="rounded-full border border-outline-variant bg-surface-container-lowest px-md py-1.5 text-xs font-semibold text-on-surface hover:bg-surface-container-low"
+          className="border-outline-variant bg-surface-container-lowest px-md text-on-surface hover:bg-surface-container-low rounded-full border py-1.5 text-xs font-semibold"
         >
           ☰ Filtros
         </button>
       </div>
 
-      <div className="grid grid-cols-1 gap-lg lg:grid-cols-[1fr_360px]">
+      <div className="gap-lg grid grid-cols-1 lg:grid-cols-[1fr_360px]">
         {/* Lançamento Expresso */}
         <form
           onSubmit={criarLancamento}
-          className="flex flex-col gap-sm rounded-xl border border-outline-variant bg-surface-container-lowest p-lg"
+          className="gap-sm border-outline-variant bg-surface-container-lowest p-lg flex flex-col rounded-xl border"
         >
-          <h2 className="flex items-center gap-1.5 text-lg font-bold text-on-surface">
+          <h2 className="text-on-surface flex items-center gap-1.5 text-lg font-bold">
             <span aria-hidden>⚡</span> Lançamento Expresso
           </h2>
 
-          <div className="grid grid-cols-2 gap-sm sm:grid-cols-4">
+          <div className="gap-sm grid grid-cols-2 sm:grid-cols-4">
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold text-on-surface-variant" htmlFor="l-data">
+              <label
+                className="text-on-surface-variant text-xs font-semibold"
+                htmlFor="l-data"
+              >
                 Data
               </label>
               <input
@@ -556,7 +611,10 @@ export function LancamentosClient() {
               />
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold text-on-surface-variant" htmlFor="l-categoria">
+              <label
+                className="text-on-surface-variant text-xs font-semibold"
+                htmlFor="l-categoria"
+              >
                 Categoria
               </label>
               <select
@@ -580,7 +638,10 @@ export function LancamentosClient() {
               </select>
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold text-on-surface-variant" htmlFor="l-subcategoria">
+              <label
+                className="text-on-surface-variant text-xs font-semibold"
+                htmlFor="l-subcategoria"
+              >
                 Subcategoria
               </label>
               <select
@@ -601,7 +662,10 @@ export function LancamentosClient() {
               </select>
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold text-on-surface-variant" htmlFor="l-banco">
+              <label
+                className="text-on-surface-variant text-xs font-semibold"
+                htmlFor="l-banco"
+              >
                 Banco / Cartão
               </label>
               <select
@@ -621,7 +685,10 @@ export function LancamentosClient() {
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-semibold text-on-surface-variant" htmlFor="l-descricao">
+            <label
+              className="text-on-surface-variant text-xs font-semibold"
+              htmlFor="l-descricao"
+            >
               Descrição
             </label>
             <input
@@ -636,7 +703,7 @@ export function LancamentosClient() {
           </div>
 
           <div className="flex flex-col gap-1">
-            <span className="text-xs font-semibold text-on-surface-variant">
+            <span className="text-on-surface-variant text-xs font-semibold">
               Quem Pagou?
             </span>
             <div className="flex flex-wrap gap-2">
@@ -647,8 +714,8 @@ export function LancamentosClient() {
                   onClick={() => setForm({ ...form, pessoaPagouId: p.id })}
                   className={
                     form.pessoaPagouId === p.id
-                      ? "rounded-lg bg-primary px-md py-1.5 text-sm font-semibold text-on-primary"
-                      : "rounded-lg border border-outline-variant bg-surface-container-lowest px-md py-1.5 text-sm text-on-surface hover:bg-surface-container-low"
+                      ? "bg-primary px-md text-on-primary rounded-lg py-1.5 text-sm font-semibold"
+                      : "border-outline-variant bg-surface-container-lowest px-md text-on-surface hover:bg-surface-container-low rounded-lg border py-1.5 text-sm"
                   }
                 >
                   {p.nome}
@@ -657,9 +724,12 @@ export function LancamentosClient() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-sm sm:grid-cols-3">
+          <div className="gap-sm grid grid-cols-1 sm:grid-cols-3">
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold text-on-surface-variant" htmlFor="l-divisao">
+              <label
+                className="text-on-surface-variant text-xs font-semibold"
+                htmlFor="l-divisao"
+              >
                 Divisão
               </label>
               <select
@@ -680,7 +750,10 @@ export function LancamentosClient() {
               </select>
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold text-on-surface-variant" htmlFor="l-valor">
+              <label
+                className="text-on-surface-variant text-xs font-semibold"
+                htmlFor="l-valor"
+              >
                 Valor (R$)
               </label>
               <input
@@ -696,7 +769,10 @@ export function LancamentosClient() {
               />
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold text-on-surface-variant" htmlFor="l-desconto">
+              <label
+                className="text-on-surface-variant text-xs font-semibold"
+                htmlFor="l-desconto"
+              >
                 Desconto / Estorno
               </label>
               <input
@@ -712,19 +788,66 @@ export function LancamentosClient() {
             </div>
           </div>
 
+          <div className="flex flex-col gap-2">
+            <label className="text-on-surface flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={form.pagoComResgateInvestimento}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    pagoComResgateInvestimento: e.target.checked,
+                    investimentoResgateId: e.target.checked
+                      ? form.investimentoResgateId
+                      : "",
+                  })
+                }
+              />
+              Pago com resgate de investimento
+            </label>
+            {form.pagoComResgateInvestimento && (
+              <div className="flex flex-col gap-1">
+                <label
+                  className="text-on-surface-variant text-xs font-semibold"
+                  htmlFor="l-investimento"
+                >
+                  Investimento (opcional)
+                </label>
+                <select
+                  id="l-investimento"
+                  className={inputClass}
+                  value={form.investimentoResgateId}
+                  onChange={(e) =>
+                    setForm({ ...form, investimentoResgateId: e.target.value })
+                  }
+                >
+                  <option value="">Não informado</option>
+                  {investimentos.map((i) => (
+                    <option key={i.id} value={i.id}>
+                      {i.produto}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+
           <button
             type="submit"
-            className="mt-1 w-fit rounded-full bg-primary px-lg py-2 text-sm font-semibold text-on-primary hover:opacity-90"
+            className="bg-primary px-lg text-on-primary mt-1 w-fit rounded-full py-2 text-sm font-semibold hover:opacity-90"
           >
             Salvar Lançamento
           </button>
         </form>
 
         {/* Importar Extrato */}
-        <div className="flex flex-col gap-sm rounded-xl border border-dashed border-outline-variant bg-surface-container-lowest p-lg">
-          <div className="grid grid-cols-1 gap-sm">
+        <div className="gap-sm border-outline-variant bg-surface-container-lowest p-lg flex flex-col rounded-xl border border-dashed">
+          <div className="gap-sm grid grid-cols-1">
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold text-on-surface-variant" htmlFor="i-banco">
+              <label
+                className="text-on-surface-variant text-xs font-semibold"
+                htmlFor="i-banco"
+              >
                 Banco / Cartão
               </label>
               <select
@@ -741,7 +864,10 @@ export function LancamentosClient() {
               </select>
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold text-on-surface-variant" htmlFor="i-template">
+              <label
+                className="text-on-surface-variant text-xs font-semibold"
+                htmlFor="i-template"
+              >
                 Modelo do arquivo
               </label>
               <select
@@ -758,9 +884,12 @@ export function LancamentosClient() {
                 ))}
               </select>
             </div>
-            <div className="grid grid-cols-2 gap-sm">
+            <div className="gap-sm grid grid-cols-2">
               <div className="flex flex-col gap-1">
-                <label className="text-xs font-semibold text-on-surface-variant" htmlFor="i-divisão">
+                <label
+                  className="text-on-surface-variant text-xs font-semibold"
+                  htmlFor="i-divisão"
+                >
                   Divisão padrão
                 </label>
                 <select
@@ -777,7 +906,10 @@ export function LancamentosClient() {
                 </select>
               </div>
               <div className="flex flex-col gap-1">
-                <label className="text-xs font-semibold text-on-surface-variant" htmlFor="i-pagou">
+                <label
+                  className="text-on-surface-variant text-xs font-semibold"
+                  htmlFor="i-pagou"
+                >
                   Pagou
                 </label>
                 <select
@@ -804,21 +936,25 @@ export function LancamentosClient() {
             onDragLeave={() => setArrastandoArquivo(false)}
             onDrop={onSoltarArquivo}
             onClick={() => inputArquivoRef.current?.click()}
-            className={`flex flex-1 cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed p-lg text-center transition-colors ${arrastandoArquivo
-              ? "border-primary bg-primary/5"
-              : "border-outline-variant"
-              }`}
+            className={`p-lg flex flex-1 cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed text-center transition-colors ${
+              arrastandoArquivo
+                ? "border-primary bg-primary/5"
+                : "border-outline-variant"
+            }`}
           >
-            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-primary-container/20 text-lg" aria-hidden>
+            <span
+              className="bg-primary-container/20 flex h-10 w-10 items-center justify-center rounded-full text-lg"
+              aria-hidden
+            >
               ⬆
             </span>
-            <p className="font-bold text-on-surface">
+            <p className="text-on-surface font-bold">
               {analisando ? "Analisando arquivo…" : "Importar OFX/CSV"}
             </p>
-            <p className="text-xs text-on-surface-variant">
+            <p className="text-on-surface-variant text-xs">
               Arraste seu extrato bancário aqui para conciliação inteligente.
             </p>
-            <span className="text-xs font-semibold text-primary underline">
+            <span className="text-primary text-xs font-semibold underline">
               Procurar arquivos
             </span>
             <input
@@ -837,7 +973,7 @@ export function LancamentosClient() {
       </div>
 
       {errosImportacao.length > 0 && (
-        <div className="rounded-xl border border-tertiary-container/30 bg-tertiary-container/10 p-sm text-sm text-tertiary-container">
+        <div className="border-tertiary-container/30 bg-tertiary-container/10 p-sm text-tertiary-container rounded-xl border text-sm">
           <p className="font-medium">
             {errosImportacao.length} linha(s) não puderam ser lidas:
           </p>
@@ -852,13 +988,13 @@ export function LancamentosClient() {
       )}
 
       {linhasRevisao.length > 0 && (
-        <div className="flex flex-col gap-sm rounded-xl border border-outline-variant bg-surface-container-lowest p-lg">
-          <div className="flex flex-wrap items-center justify-between gap-sm">
+        <div className="gap-sm border-outline-variant bg-surface-container-lowest p-lg flex flex-col rounded-xl border">
+          <div className="gap-sm flex flex-wrap items-center justify-between">
             <div className="flex items-center gap-2">
-              <h2 className="text-lg font-bold text-on-surface">
+              <h2 className="text-on-surface text-lg font-bold">
                 Revisão de Importações
               </h2>
-              <span className="rounded-full bg-secondary-container px-sm py-0.5 text-xs font-bold text-on-secondary-container">
+              <span className="bg-secondary-container px-sm text-on-secondary-container rounded-full py-0.5 text-xs font-bold">
                 {linhasNaoDuplicadas.length} Pendentes
               </span>
             </div>
@@ -866,16 +1002,18 @@ export function LancamentosClient() {
               <button
                 type="button"
                 onClick={() => setAcoesEmMassaAberto((v) => !v)}
-                className="rounded-full border border-outline-variant bg-surface-container-lowest px-md py-1.5 text-xs font-semibold text-on-surface hover:bg-surface-container-low"
+                className="border-outline-variant bg-surface-container-lowest px-md text-on-surface hover:bg-surface-container-low rounded-full border py-1.5 text-xs font-semibold"
               >
                 Ações em Massa
               </button>
               <button
                 type="button"
                 onClick={() =>
-                  confirmarLinhas(linhasNaoDuplicadas.filter((l) => l.selecionada))
+                  confirmarLinhas(
+                    linhasNaoDuplicadas.filter((l) => l.selecionada),
+                  )
                 }
-                className="rounded-full bg-primary px-md py-1.5 text-xs font-semibold text-on-primary hover:opacity-90"
+                className="bg-primary px-md text-on-primary rounded-full py-1.5 text-xs font-semibold hover:opacity-90"
               >
                 Aprovar Tudo
               </button>
@@ -883,9 +1021,12 @@ export function LancamentosClient() {
           </div>
 
           {acoesEmMassaAberto && (
-            <div className="flex flex-wrap items-end gap-2 rounded-lg bg-surface-container-low p-sm">
+            <div className="bg-surface-container-low p-sm flex flex-wrap items-end gap-2 rounded-lg">
               <div className="flex flex-col gap-1">
-                <label className="text-xs font-semibold text-on-surface-variant" htmlFor="massa-categoria">
+                <label
+                  className="text-on-surface-variant text-xs font-semibold"
+                  htmlFor="massa-categoria"
+                >
                   Aplicar categoria às linhas selecionadas
                 </label>
                 <select
@@ -906,14 +1047,14 @@ export function LancamentosClient() {
                 type="button"
                 disabled={!categoriaEmMassa}
                 onClick={aplicarCategoriaEmMassa}
-                className="rounded-full bg-primary px-md py-1.5 text-xs font-semibold text-on-primary disabled:opacity-50 hover:opacity-90"
+                className="bg-primary px-md text-on-primary rounded-full py-1.5 text-xs font-semibold hover:opacity-90 disabled:opacity-50"
               >
                 Aplicar
               </button>
               <button
                 type="button"
                 onClick={() => setAcoesEmMassaAberto(false)}
-                className="text-xs text-on-surface-variant"
+                className="text-on-surface-variant text-xs"
               >
                 Cancelar
               </button>
@@ -923,7 +1064,7 @@ export function LancamentosClient() {
           <div className="overflow-x-auto">
             <table className="min-w-full border-collapse text-sm">
               <thead>
-                <tr className="border-b border-outline-variant text-left text-xs font-semibold uppercase tracking-wide text-on-surface-variant">
+                <tr className="border-outline-variant text-on-surface-variant border-b text-left text-xs font-semibold tracking-wide uppercase">
                   <th className="p-2"></th>
                   <th className="p-2">Data</th>
                   <th className="p-2">Descrição</th>
@@ -942,14 +1083,23 @@ export function LancamentosClient() {
                   const divisaoPessoa = pessoasPorId.get(linha.pessoaDivisaoId);
                   const ehAjuste = linha.valorCentavos < 0;
                   const tipo = ehAjuste
-                    ? { label: "Ajuste", classe: "bg-surface-container text-on-surface-variant" }
+                    ? {
+                        label: "Ajuste",
+                        classe: "bg-surface-container text-on-surface-variant",
+                      }
                     : divisaoPessoa?.tipo === "INDIVIDUAL"
-                      ? { label: "Individual", classe: "bg-secondary/10 text-secondary" }
-                      : { label: "Dividido", classe: "bg-primary/10 text-primary" };
+                      ? {
+                          label: "Individual",
+                          classe: "bg-secondary/10 text-secondary",
+                        }
+                      : {
+                          label: "Dividido",
+                          classe: "bg-primary/10 text-primary",
+                        };
                   return (
                     <tr
                       key={linha.hash}
-                      className={`border-b border-outline-variant/60 ${linha.duplicado ? "opacity-50" : ""}`}
+                      className={`border-outline-variant/60 border-b ${linha.duplicado ? "opacity-50" : ""}`}
                     >
                       <td className="p-2">
                         <input
@@ -963,13 +1113,13 @@ export function LancamentosClient() {
                           }
                         />
                       </td>
-                      <td className="whitespace-nowrap p-2">{linha.data}</td>
+                      <td className="p-2 whitespace-nowrap">{linha.data}</td>
                       <td className="p-2">
-                        <p className="font-semibold text-on-surface">
+                        <p className="text-on-surface font-semibold">
                           {linha.descricaoOrigem}
                         </p>
                         {linha.duplicado && (
-                          <span className="rounded-full bg-surface-container px-1.5 py-0.5 text-xs text-on-surface-variant">
+                          <span className="bg-surface-container text-on-surface-variant rounded-full px-1.5 py-0.5 text-xs">
                             já importado
                           </span>
                         )}
@@ -1030,7 +1180,7 @@ export function LancamentosClient() {
                       </td>
                       <td className="p-2">
                         <span
-                          className={`rounded-full px-sm py-0.5 text-xs font-semibold ${tipo.classe}`}
+                          className={`px-sm rounded-full py-0.5 text-xs font-semibold ${tipo.classe}`}
                         >
                           {tipo.label}
                         </span>
@@ -1048,7 +1198,7 @@ export function LancamentosClient() {
                               type="button"
                               title="Aprovar esta linha"
                               onClick={() => confirmarLinhas([linha])}
-                              className="text-sm font-semibold text-success"
+                              className="text-success text-sm font-semibold"
                             >
                               ✓
                             </button>
@@ -1057,7 +1207,7 @@ export function LancamentosClient() {
                             type="button"
                             title="Remover da lista"
                             onClick={() => removerLinhaRevisao(linha.hash)}
-                            className="text-sm font-semibold text-danger"
+                            className="text-danger text-sm font-semibold"
                           >
                             ✕
                           </button>
@@ -1070,7 +1220,7 @@ export function LancamentosClient() {
             </table>
           </div>
 
-          <div className="flex items-center justify-between text-xs text-on-surface-variant">
+          <div className="text-on-surface-variant flex items-center justify-between text-xs">
             <span>
               Mostrando {linhasRevisaoPagina.length} de {linhasRevisao.length}{" "}
               pendentes
@@ -1080,7 +1230,7 @@ export function LancamentosClient() {
                 type="button"
                 disabled={paginaRevisao === 0}
                 onClick={() => setPaginaRevisao((p) => Math.max(0, p - 1))}
-                className="rounded-full border border-outline-variant px-sm py-1 disabled:opacity-40"
+                className="border-outline-variant px-sm rounded-full border py-1 disabled:opacity-40"
               >
                 Anterior
               </button>
@@ -1088,9 +1238,11 @@ export function LancamentosClient() {
                 type="button"
                 disabled={paginaRevisao >= totalPaginasRevisao - 1}
                 onClick={() =>
-                  setPaginaRevisao((p) => Math.min(totalPaginasRevisao - 1, p + 1))
+                  setPaginaRevisao((p) =>
+                    Math.min(totalPaginasRevisao - 1, p + 1),
+                  )
                 }
-                className="rounded-full border border-outline-variant px-sm py-1 disabled:opacity-40"
+                className="border-outline-variant px-sm rounded-full border py-1 disabled:opacity-40"
               >
                 Próximo
               </button>
@@ -1100,9 +1252,12 @@ export function LancamentosClient() {
       )}
 
       {mostrarFiltros && (
-        <div className="flex flex-wrap items-end gap-sm rounded-xl border border-outline-variant bg-surface-container-lowest p-lg">
+        <div className="gap-sm border-outline-variant bg-surface-container-lowest p-lg flex flex-wrap items-end rounded-xl border">
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-semibold text-on-surface-variant" htmlFor="f-inicio">
+            <label
+              className="text-on-surface-variant text-xs font-semibold"
+              htmlFor="f-inicio"
+            >
               De
             </label>
             <input
@@ -1114,7 +1269,10 @@ export function LancamentosClient() {
             />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-semibold text-on-surface-variant" htmlFor="f-fim">
+            <label
+              className="text-on-surface-variant text-xs font-semibold"
+              htmlFor="f-fim"
+            >
               Até
             </label>
             <input
@@ -1126,7 +1284,10 @@ export function LancamentosClient() {
             />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-semibold text-on-surface-variant" htmlFor="f-categoria">
+            <label
+              className="text-on-surface-variant text-xs font-semibold"
+              htmlFor="f-categoria"
+            >
               Categoria
             </label>
             <select
@@ -1144,7 +1305,10 @@ export function LancamentosClient() {
             </select>
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-semibold text-on-surface-variant" htmlFor="f-banco">
+            <label
+              className="text-on-surface-variant text-xs font-semibold"
+              htmlFor="f-banco"
+            >
               Banco
             </label>
             <select
@@ -1162,7 +1326,10 @@ export function LancamentosClient() {
             </select>
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-semibold text-on-surface-variant" htmlFor="f-pessoa">
+            <label
+              className="text-on-surface-variant text-xs font-semibold"
+              htmlFor="f-pessoa"
+            >
               Pessoa
             </label>
             <select
@@ -1182,10 +1349,10 @@ export function LancamentosClient() {
         </div>
       )}
 
-      <div className="overflow-x-auto rounded-xl border border-outline-variant bg-surface-container-lowest">
-        <table className="min-w-full border-collapse text-sm">
+      <div className="border-outline-variant bg-surface-container-lowest overflow-x-auto rounded-xl border">
+        <table className="w-full border-collapse text-sm">
           <thead>
-            <tr className="border-b border-outline-variant text-xs font-semibold uppercase tracking-wide text-on-surface-variant">
+            <tr className="border-outline-variant text-on-surface-variant border-b text-xs font-semibold tracking-wide uppercase">
               <ColumnHeader
                 label="Data"
                 chave="data"
@@ -1225,6 +1392,17 @@ export function LancamentosClient() {
                 ordenacao={ordenacao}
                 onOrdenar={aoOrdenarColuna}
                 filtro={filtros.categoria}
+                onFiltrar={aoFiltrarColuna}
+                onLimparFiltro={aoLimparFiltroColuna}
+              />
+              <ColumnHeader
+                label="Subcategoria"
+                chave="subcategoria"
+                tipo="opcoes"
+                opcoes={opcoesColunas.subcategoria}
+                ordenacao={ordenacao}
+                onOrdenar={aoOrdenarColuna}
+                filtro={filtros.subcategoria}
                 onFiltrar={aoFiltrarColuna}
                 onLimparFiltro={aoLimparFiltroColuna}
               />
@@ -1269,7 +1447,7 @@ export function LancamentosClient() {
               .slice(
                 paginaLancamentos * TAMANHO_PAGINA_LANCAMENTOS,
                 paginaLancamentos * TAMANHO_PAGINA_LANCAMENTOS +
-                TAMANHO_PAGINA_LANCAMENTOS,
+                  TAMANHO_PAGINA_LANCAMENTOS,
               )
               .map((lancamento) => (
                 <LinhaLancamento
@@ -1278,9 +1456,14 @@ export function LancamentosClient() {
                   categorias={categorias}
                   bancos={bancos}
                   pessoas={pessoas}
+                  investimentos={investimentos}
                   nome={nome}
                   onAtualizar={atualizarLancamento}
                   onRemover={removerLancamento}
+                  emEdicao={editandoId === lancamento.id}
+                  onIniciarEdicao={() => setEditandoId(lancamento.id)}
+                  onCancelarEdicao={() => setEditandoId(null)}
+                  onAbrirDetalhe={() => setDetalheId(lancamento.id)}
                 />
               ))}
           </tbody>
@@ -1288,7 +1471,7 @@ export function LancamentosClient() {
       </div>
 
       {lancamentos && lancamentosProcessados.length === 0 && (
-        <p className="text-sm text-on-surface-variant">
+        <p className="text-on-surface-variant text-sm">
           {lancamentos.length === 0
             ? "Nenhum lançamento encontrado."
             : "Nenhum lançamento corresponde aos filtros das colunas."}
@@ -1296,7 +1479,7 @@ export function LancamentosClient() {
       )}
 
       {lancamentosProcessados.length > TAMANHO_PAGINA_LANCAMENTOS && (
-        <div className="flex items-center justify-between text-xs text-on-surface-variant">
+        <div className="text-on-surface-variant flex items-center justify-between text-xs">
           <span>
             Mostrando{" "}
             {Math.min(
@@ -1311,7 +1494,7 @@ export function LancamentosClient() {
               type="button"
               disabled={paginaLancamentos === 0}
               onClick={() => setPaginaLancamentos((p) => Math.max(0, p - 1))}
-              className="rounded-full border border-outline-variant px-sm py-1 disabled:opacity-40"
+              className="border-outline-variant px-sm rounded-full border py-1 disabled:opacity-40"
             >
               Anterior
             </button>
@@ -1322,12 +1505,31 @@ export function LancamentosClient() {
                 lancamentosProcessados.length
               }
               onClick={() => setPaginaLancamentos((p) => p + 1)}
-              className="rounded-full border border-outline-variant px-sm py-1 disabled:opacity-40"
+              className="border-outline-variant px-sm rounded-full border py-1 disabled:opacity-40"
             >
               Próximo
             </button>
           </div>
         </div>
+      )}
+
+      {lancamentoDetalhe && (
+        <DetalheLancamentoDrawer
+          lancamento={lancamentoDetalhe}
+          pessoas={pessoas}
+          investimentos={investimentos}
+          nome={nome}
+          onFechar={() => setDetalheId(null)}
+          onEditar={() => {
+            setEditandoId(lancamentoDetalhe.id);
+            setDetalheId(null);
+          }}
+          onRemover={async () => {
+            if (await removerLancamento(lancamentoDetalhe)) {
+              setDetalheId(null);
+            }
+          }}
+        />
       )}
     </div>
   );
@@ -1338,14 +1540,20 @@ function LinhaLancamento({
   categorias,
   bancos,
   pessoas,
+  investimentos,
   nome,
   onAtualizar,
   onRemover,
+  emEdicao,
+  onIniciarEdicao,
+  onCancelarEdicao,
+  onAbrirDetalhe,
 }: {
   lancamento: Lancamento;
   categorias: Categoria[];
   bancos: Banco[];
   pessoas: Pessoa[];
+  investimentos: Investimento[];
   nome: {
     banco: (id: string) => string;
     pessoa: (id: string) => string;
@@ -1353,13 +1561,14 @@ function LinhaLancamento({
     subcategoria: (id: string | null) => string;
   };
   onAtualizar: (id: string, input: Partial<Lancamento>) => Promise<void>;
-  onRemover: (lancamento: Lancamento) => Promise<void>;
+  onRemover: (lancamento: Lancamento) => Promise<boolean>;
+  emEdicao: boolean;
+  onIniciarEdicao: () => void;
+  onCancelarEdicao: () => void;
+  onAbrirDetalhe: () => void;
 }) {
-  const [editando, setEditando] = useState(false);
   const [data, setData] = useState(dataParaInputDate(lancamento.data));
-  const [descricao, setDescricao] = useState(
-    lancamento.descricaoPropria ?? "",
-  );
+  const [descricao, setDescricao] = useState(lancamento.descricaoPropria ?? "");
   const [valor, setValor] = useState(
     centavosParaReais(lancamento.valorCentavos),
   );
@@ -1374,6 +1583,12 @@ function LinhaLancamento({
     lancamento.pessoaDivisaoId,
   );
   const [pessoaPagouId, setPessoaPagouId] = useState(lancamento.pessoaPagouId);
+  const [pagoComResgateInvestimento, setPagoComResgateInvestimento] = useState(
+    lancamento.pagoComResgateInvestimento ?? false,
+  );
+  const [investimentoResgateId, setInvestimentoResgateId] = useState(
+    lancamento.investimentoResgateId ?? "",
+  );
 
   const valorLiquido = lancamento.valorCentavos - lancamento.descontoCentavos;
   const subcategoriasDaCategoria =
@@ -1389,20 +1604,24 @@ function LinhaLancamento({
       bancoId,
       pessoaDivisaoId,
       pessoaPagouId,
+      pagoComResgateInvestimento,
+      investimentoResgateId: pagoComResgateInvestimento
+        ? investimentoResgateId || null
+        : null,
     });
-    setEditando(false);
+    onCancelarEdicao();
   }
 
   const inputClass =
     "rounded-lg border border-outline-variant bg-surface-container-lowest px-2 py-1";
 
-  if (editando) {
+  if (emEdicao) {
     return (
-      <tr className="border-b border-outline-variant/60 bg-surface-container-low">
-        <td colSpan={8} className="p-sm">
-          <div className="flex flex-wrap items-end gap-sm">
+      <tr className="border-outline-variant/60 bg-surface-container-low border-b">
+        <td colSpan={9} className="p-sm">
+          <div className="gap-sm flex flex-wrap items-end">
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold text-on-surface-variant">
+              <label className="text-on-surface-variant text-xs font-semibold">
                 Data
               </label>
               <input
@@ -1413,17 +1632,18 @@ function LinhaLancamento({
               />
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold text-on-surface-variant">
+              <label className="text-on-surface-variant text-xs font-semibold">
                 Descrição
               </label>
               <input
                 className={inputClass}
                 value={descricao}
                 onChange={(e) => setDescricao(e.target.value)}
+                placeholder={lancamento.descricaoOrigem ?? ""}
               />
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold text-on-surface-variant">
+              <label className="text-on-surface-variant text-xs font-semibold">
                 Valor
               </label>
               <input
@@ -1435,7 +1655,7 @@ function LinhaLancamento({
               />
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold text-on-surface-variant">
+              <label className="text-on-surface-variant text-xs font-semibold">
                 Categoria
               </label>
               <select
@@ -1455,7 +1675,7 @@ function LinhaLancamento({
               </select>
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold text-on-surface-variant">
+              <label className="text-on-surface-variant text-xs font-semibold">
                 Subcategoria
               </label>
               <select
@@ -1473,7 +1693,7 @@ function LinhaLancamento({
               </select>
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold text-on-surface-variant">
+              <label className="text-on-surface-variant text-xs font-semibold">
                 Banco
               </label>
               <select
@@ -1489,7 +1709,7 @@ function LinhaLancamento({
               </select>
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold text-on-surface-variant">
+              <label className="text-on-surface-variant text-xs font-semibold">
                 Divisão
               </label>
               <select
@@ -1505,7 +1725,7 @@ function LinhaLancamento({
               </select>
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold text-on-surface-variant">
+              <label className="text-on-surface-variant text-xs font-semibold">
                 Pagou
               </label>
               <select
@@ -1519,6 +1739,33 @@ function LinhaLancamento({
                   </option>
                 ))}
               </select>
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-on-surface-variant flex items-center gap-1.5 text-xs font-semibold">
+                <input
+                  type="checkbox"
+                  checked={pagoComResgateInvestimento}
+                  onChange={(e) => {
+                    setPagoComResgateInvestimento(e.target.checked);
+                    if (!e.target.checked) setInvestimentoResgateId("");
+                  }}
+                />
+                Resgate de investimento
+              </label>
+              {pagoComResgateInvestimento && (
+                <select
+                  className={inputClass}
+                  value={investimentoResgateId}
+                  onChange={(e) => setInvestimentoResgateId(e.target.value)}
+                >
+                  <option value="">Não informado</option>
+                  {investimentos.map((i) => (
+                    <option key={i.id} value={i.id}>
+                      {i.produto}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
             <div className="flex gap-2">
               <button
@@ -1541,7 +1788,7 @@ function LinhaLancamento({
               </button>
               <button
                 className="text-on-surface-variant hover:bg-surface-container rounded-full p-1.5 transition-colors"
-                onClick={() => setEditando(false)}
+                onClick={onCancelarEdicao}
                 title="Cancelar"
                 aria-label="Cancelar"
               >
@@ -1565,21 +1812,41 @@ function LinhaLancamento({
     );
   }
 
-  const divisaoPessoa = pessoas.find((p) => p.id === lancamento.pessoaDivisaoId);
+  const divisaoPessoa = pessoas.find(
+    (p) => p.id === lancamento.pessoaDivisaoId,
+  );
 
   return (
-    <tr className="border-b border-outline-variant/60 hover:bg-surface-container-low">
-      <td className="p-2">{dataParaInputDate(lancamento.data)}</td>
-      <td className="p-2">{lancamento.descricaoPropria || "—"}</td>
-      <td className="data-tabular p-2 text-right">R$ {centavosParaReais(valorLiquido)}</td>
-      <td className="p-2">
-        {nome.categoria(lancamento.categoriaId)}
-        {lancamento.subcategoriaId
-          ? ` / ${nome.subcategoria(lancamento.subcategoriaId)}`
-          : ""}
+    <tr
+      className="border-outline-variant/60 hover:bg-surface-container-low cursor-pointer border-b"
+      onClick={onAbrirDetalhe}
+    >
+      <td className="p-2 whitespace-nowrap">
+        {dataParaInputDate(lancamento.data)}
       </td>
-      <td className="p-2">{nome.banco(lancamento.bancoId)}</td>
-      <td className="p-2">
+      <td
+        className="max-w-xs truncate p-2"
+        title={
+          lancamento.descricaoPropria || lancamento.descricaoOrigem || undefined
+        }
+      >
+        {lancamento.descricaoPropria || lancamento.descricaoOrigem || "—"}
+      </td>
+      <td className="data-tabular p-2 text-right whitespace-nowrap">
+        R$ {centavosParaReais(valorLiquido)}
+      </td>
+      <td className="p-2 whitespace-nowrap">
+        {nome.categoria(lancamento.categoriaId)}
+      </td>
+      <td className="p-2 whitespace-nowrap">
+        {lancamento.subcategoriaId
+          ? nome.subcategoria(lancamento.subcategoriaId)
+          : "—"}
+      </td>
+      <td className="p-2 whitespace-nowrap">
+        {nome.banco(lancamento.bancoId)}
+      </td>
+      <td className="p-2 whitespace-nowrap">
         {divisaoPessoa ? (
           <PessoaBadge
             nome={divisaoPessoa.nome}
@@ -1590,11 +1857,13 @@ function LinhaLancamento({
           nome.pessoa(lancamento.pessoaDivisaoId)
         )}
       </td>
-      <td className="p-2">{nome.pessoa(lancamento.pessoaPagouId)}</td>
-      <td className="flex gap-2 p-2">
+      <td className="p-2 whitespace-nowrap">
+        {nome.pessoa(lancamento.pessoaPagouId)}
+      </td>
+      <td className="flex gap-2 p-2" onClick={(e) => e.stopPropagation()}>
         <button
           className="text-primary hover:bg-surface-container rounded-full p-1.5 transition-colors"
-          onClick={() => setEditando(true)}
+          onClick={onIniciarEdicao}
           title="Editar"
           aria-label="Editar"
         >
@@ -1635,5 +1904,148 @@ function LinhaLancamento({
         </button>
       </td>
     </tr>
+  );
+}
+
+function DetalheLancamentoDrawer({
+  lancamento,
+  pessoas,
+  investimentos,
+  nome,
+  onFechar,
+  onEditar,
+  onRemover,
+}: {
+  lancamento: Lancamento;
+  pessoas: Pessoa[];
+  investimentos: Investimento[];
+  nome: {
+    banco: (id: string) => string;
+    pessoa: (id: string) => string;
+    categoria: (id: string | null) => string;
+    subcategoria: (id: string | null) => string;
+  };
+  onFechar: () => void;
+  onEditar: () => void;
+  onRemover: () => void;
+}) {
+  const valorLiquido = lancamento.valorCentavos - lancamento.descontoCentavos;
+  const divisaoPessoa = pessoas.find(
+    (p) => p.id === lancamento.pessoaDivisaoId,
+  );
+  const categoriaLabel = lancamento.subcategoriaId
+    ? `${nome.categoria(lancamento.categoriaId)} (${nome.subcategoria(lancamento.subcategoriaId)})`
+    : nome.categoria(lancamento.categoriaId);
+  const investimentoResgate = investimentos.find(
+    (i) => i.id === lancamento.investimentoResgateId,
+  );
+  const resgateLabel = lancamento.pagoComResgateInvestimento
+    ? investimentoResgate
+      ? `Sim — ${investimentoResgate.produto}`
+      : "Sim"
+    : "Não";
+
+  return (
+    <div
+      className="bg-on-surface/40 fixed inset-0 z-[100] flex justify-end"
+      onClick={onFechar}
+    >
+      <div
+        className="gap-md border-outline-variant bg-surface-container-lowest p-lg flex h-full w-full max-w-[28rem] flex-col overflow-y-auto border-l shadow-lg"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between">
+          <h2 className="text-on-surface text-lg font-bold">
+            Detalhes do lançamento
+          </h2>
+          <button
+            type="button"
+            onClick={onFechar}
+            title="Fechar"
+            aria-label="Fechar"
+            className="text-on-surface-variant hover:bg-surface-container rounded-full p-1.5"
+          >
+            <svg
+              className="h-5 w-5"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M18 6 6 18" />
+              <path d="m6 6 12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <CampoDetalhe label="Data" valor={dataParaInputDate(lancamento.data)} />
+        <CampoDetalhe
+          label="Descrição"
+          valor={
+            lancamento.descricaoPropria || lancamento.descricaoOrigem || "—"
+          }
+        />
+        <CampoDetalhe
+          label="Valor"
+          valor={`R$ ${centavosParaReais(valorLiquido)}`}
+        />
+        <CampoDetalhe label="Categoria" valor={categoriaLabel} />
+        <CampoDetalhe label="Banco" valor={nome.banco(lancamento.bancoId)} />
+        <div className="flex flex-col gap-1">
+          <span className="text-on-surface-variant text-xs font-semibold tracking-wide uppercase">
+            Divisão
+          </span>
+          {divisaoPessoa ? (
+            <PessoaBadge
+              nome={divisaoPessoa.nome}
+              pessoaId={divisaoPessoa.id}
+              compartilhado={divisaoPessoa.tipo !== "INDIVIDUAL"}
+            />
+          ) : (
+            <span className="text-on-surface text-sm">
+              {nome.pessoa(lancamento.pessoaDivisaoId)}
+            </span>
+          )}
+        </div>
+        <CampoDetalhe
+          label="Pagou"
+          valor={nome.pessoa(lancamento.pessoaPagouId)}
+        />
+        <CampoDetalhe
+          label="Pago com resgate de investimento"
+          valor={resgateLabel}
+        />
+
+        <div className="border-outline-variant pt-md mt-auto flex gap-2 border-t">
+          <button
+            type="button"
+            onClick={onEditar}
+            className="border-outline-variant px-md text-on-surface hover:bg-surface-container-low flex-1 rounded-full border py-2 text-sm font-semibold"
+          >
+            Editar
+          </button>
+          <button
+            type="button"
+            onClick={onRemover}
+            className="bg-danger px-md text-on-danger flex-1 rounded-full py-2 text-sm font-semibold hover:opacity-90"
+          >
+            Remover
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CampoDetalhe({ label, valor }: { label: string; valor: string }) {
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="text-on-surface-variant text-xs font-semibold tracking-wide uppercase">
+        {label}
+      </span>
+      <span className="text-on-surface text-sm break-words">{valor}</span>
+    </div>
   );
 }

@@ -56,7 +56,9 @@ export function ColumnHeader({
   const filtroAtivo = filtroEstaAtivo(filtroAtual);
 
   return (
-    <th className={`p-2 select-none ${align === "right" ? "text-right" : "text-left"}`}>
+    <th
+      className={`p-2 whitespace-nowrap select-none ${align === "right" ? "text-right" : "text-left"}`}
+    >
       <div
         className={`flex items-center gap-1 ${align === "right" ? "justify-end" : ""}`}
       >

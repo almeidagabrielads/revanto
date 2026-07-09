@@ -296,7 +296,7 @@ export async function buscarSaldoDivisaoGrupo(
       select: {
         id: true,
         nome: true,
-        integrantes: { select: { pessoaId: true, peso: true } },
+        integrantesDoGrupo: { select: { pessoaId: true, peso: true } },
       },
     }),
   ]);
@@ -333,7 +333,7 @@ export async function buscarSaldoDivisaoGrupo(
   const integrantesPorGrupo = new Map<string, ParticipanteDivisao[]>(
     grupos.map((g) => [
       g.id,
-      g.integrantes.map((i) => ({ pessoaId: i.pessoaId, peso: i.peso })),
+      g.integrantesDoGrupo.map((i) => ({ pessoaId: i.pessoaId, peso: i.peso })),
     ]),
   );
   const lancamentosParaDivisao = lancamentos.map((l) => ({
@@ -373,7 +373,7 @@ export async function buscarSaldoDivisaoGrupo(
       .map((l) => l.pessoaDivisaoId),
   );
   const gruposSemComposicao: GrupoSemComposicao[] = grupos
-    .filter((g) => gruposComLancamento.has(g.id) && g.integrantes.length === 0)
+    .filter((g) => gruposComLancamento.has(g.id) && g.integrantesDoGrupo.length === 0)
     .map((g) => ({ pessoaId: g.id, nome: g.nome }));
 
   const totalPagoPorPessoa: TotalPagoPessoa[] = participanteIds.map(

@@ -35,7 +35,7 @@ export function listarPessoas(prisma: PrismaClient, householdId: string) {
   return prisma.pessoa.findMany({
     where: { householdId },
     orderBy: { nome: "asc" },
-    include: { integrantes: { select: { pessoaId: true, peso: true } } },
+    include: { integrantesDoGrupo: { select: { pessoaId: true, peso: true } } },
   });
 }
 
@@ -171,10 +171,10 @@ export async function resolverPessoasEfetivas(
 ): Promise<string[]> {
   const pessoa = await prisma.pessoa.findFirst({
     where: { id: pessoaId, householdId },
-    select: { tipo: true, integrantes: { select: { pessoaId: true } } },
+    select: { tipo: true, integrantesDoGrupo: { select: { pessoaId: true } } },
   });
   if (!pessoa || pessoa.tipo === "INDIVIDUAL") return [pessoaId];
-  return [pessoaId, ...pessoa.integrantes.map((i) => i.pessoaId)];
+  return [pessoaId, ...pessoa.integrantesDoGrupo.map((i) => i.pessoaId)];
 }
 
 /**
@@ -195,13 +195,13 @@ export async function resolverFracaoPorGrupo(
     select: {
       grupoId: true,
       peso: true,
-      grupo: { select: { integrantes: { select: { peso: true } } } },
+      grupo: { select: { integrantesDoGrupo: { select: { peso: true } } } },
     },
   });
 
   const fracaoPorGrupo = new Map<string, number>();
   for (const p of participacoes) {
-    const somaPesos = p.grupo.integrantes.reduce((s, i) => s + i.peso, 0);
+    const somaPesos = p.grupo.integrantesDoGrupo.reduce((s, i) => s + i.peso, 0);
     if (somaPesos > 0) {
       fracaoPorGrupo.set(p.grupoId, p.peso / somaPesos);
     }

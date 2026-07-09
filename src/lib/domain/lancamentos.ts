@@ -17,16 +17,19 @@ export const CriarLancamentoSchema = z.object({
   bancoId: z.string().trim().min(1, "Banco é obrigatório."),
   pessoaDivisaoId: z.string().trim().min(1, "Divisão é obrigatória."),
   pessoaPagouId: z.string().trim().min(1, "Quem pagou é obrigatório."),
+  pagoComResgateInvestimento: z.boolean().default(false),
+  investimentoResgateId: z.string().trim().min(1).nullish(),
 });
 
 export const AtualizarLancamentoSchema = CriarLancamentoSchema.partial();
 
-// descontoCentavos fica opcional aqui (mesmo com default no schema Zod) —
-// o valor default é aplicado tanto pelo zod (na rota) quanto pelo Prisma (no schema).
+// descontoCentavos e pagoComResgateInvestimento ficam opcionais aqui (mesmo com
+// default no schema Zod) — o valor default é aplicado tanto pelo zod (na rota)
+// quanto pelo Prisma (no schema).
 export type CriarLancamentoInput = Omit<
   z.infer<typeof CriarLancamentoSchema>,
-  "descontoCentavos"
-> & { descontoCentavos?: number };
+  "descontoCentavos" | "pagoComResgateInvestimento"
+> & { descontoCentavos?: number; pagoComResgateInvestimento?: boolean };
 export type AtualizarLancamentoInput = z.infer<
   typeof AtualizarLancamentoSchema
 >;
@@ -37,6 +40,7 @@ type ReferenciasLancamento = {
   pessoaPagouId: string;
   categoriaId?: string | null;
   subcategoriaId?: string | null;
+  investimentoResgateId?: string | null;
 };
 
 // Confere que banco/pessoas pertencem ao household e que, se informada, a
@@ -72,6 +76,13 @@ async function referenciasValidas(
       where: { id: refs.categoriaId, householdId },
     });
     if (!categoria) return false;
+  }
+
+  if (refs.investimentoResgateId) {
+    const investimento = await prisma.investimento.findFirst({
+      where: { id: refs.investimentoResgateId, householdId },
+    });
+    if (!investimento) return false;
   }
 
   return true;
@@ -167,6 +178,10 @@ export async function atualizarLancamento(
       input.subcategoriaId !== undefined
         ? input.subcategoriaId
         : existente.subcategoriaId,
+    investimentoResgateId:
+      input.investimentoResgateId !== undefined
+        ? input.investimentoResgateId
+        : existente.investimentoResgateId,
   };
   const valido = await referenciasValidas(prisma, householdId, refs);
   if (!valido) return null;

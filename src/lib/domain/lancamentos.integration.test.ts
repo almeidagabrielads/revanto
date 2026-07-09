@@ -4,6 +4,7 @@ import { criarCategoria } from "./categorias";
 import { criarSubcategoria } from "./subcategorias";
 import { criarBanco } from "./bancos";
 import { criarPessoa } from "./pessoas";
+import { criarInvestimento } from "./investimentos";
 import {
   atualizarLancamento,
   buscarLancamento,
@@ -152,6 +153,84 @@ describe("criarLancamento", () => {
 
     expect(lancamento).toBeNull();
   });
+
+  it("aceita marcação de pago com resgate de investimento (sem selecionar qual)", async () => {
+    const h = await criarHousehold();
+    const { banco, isa } = await montarCadastros(h.id);
+
+    const lancamento = await criarLancamento(prismaTest, h.id, {
+      data: new Date("2026-06-10"),
+      valorCentavos: 1000,
+      bancoId: banco.id,
+      pessoaDivisaoId: isa.id,
+      pessoaPagouId: isa.id,
+      pagoComResgateInvestimento: true,
+    });
+
+    expect(lancamento?.pagoComResgateInvestimento).toBe(true);
+    expect(lancamento?.investimentoResgateId).toBeNull();
+  });
+
+  it("aceita marcação de pago com resgate de investimento com o investimento selecionado", async () => {
+    const h = await criarHousehold();
+    const { banco, isa } = await montarCadastros(h.id);
+    const investimento = await criarInvestimento(prismaTest, h.id, {
+      bancoId: banco.id,
+      tipo: "RENDA_FIXA",
+      produto: "CDB Banco X",
+      valorAtualCentavos: 100000,
+      pessoaId: isa.id,
+    });
+    if (!investimento) throw new Error("falha ao criar investimento de teste");
+
+    const lancamento = await criarLancamento(prismaTest, h.id, {
+      data: new Date("2026-06-10"),
+      valorCentavos: 1000,
+      bancoId: banco.id,
+      pessoaDivisaoId: isa.id,
+      pessoaPagouId: isa.id,
+      pagoComResgateInvestimento: true,
+      investimentoResgateId: investimento.id,
+    });
+
+    expect(lancamento?.pagoComResgateInvestimento).toBe(true);
+    expect(lancamento?.investimentoResgateId).toBe(investimento.id);
+  });
+
+  it("retorna null se investimento selecionado pertence a outro household", async () => {
+    const h1 = await criarHousehold("Casa A");
+    const h2 = await criarHousehold("Casa B");
+    const { banco, isa } = await montarCadastros(h1.id);
+    const bancoOutraCasa = await criarBanco(prismaTest, h2.id, {
+      nome: "Itaú",
+      tipo: "CONTA_CORRENTE",
+    });
+    const pessoaOutraCasa = await criarPessoa(prismaTest, h2.id, {
+      nome: "Zeca",
+      tipo: "INDIVIDUAL",
+    });
+    const investimentoDeOutraCasa = await criarInvestimento(prismaTest, h2.id, {
+      bancoId: bancoOutraCasa.id,
+      tipo: "RENDA_FIXA",
+      produto: "CDB Banco Y",
+      valorAtualCentavos: 50000,
+      pessoaId: pessoaOutraCasa.id,
+    });
+    if (!investimentoDeOutraCasa)
+      throw new Error("falha ao criar investimento de teste");
+
+    const lancamento = await criarLancamento(prismaTest, h1.id, {
+      data: new Date("2026-06-10"),
+      valorCentavos: 1000,
+      bancoId: banco.id,
+      pessoaDivisaoId: isa.id,
+      pessoaPagouId: isa.id,
+      pagoComResgateInvestimento: true,
+      investimentoResgateId: investimentoDeOutraCasa.id,
+    });
+
+    expect(lancamento).toBeNull();
+  });
 });
 
 describe("atualizarLancamento", () => {
@@ -211,6 +290,47 @@ describe("atualizarLancamento", () => {
       valorCentavos: 100,
     });
     expect(atualizado).toBeNull();
+  });
+
+  it("marca e desmarca pago com resgate de investimento", async () => {
+    const h = await criarHousehold();
+    const { banco, isa } = await montarCadastros(h.id);
+    const investimento = await criarInvestimento(prismaTest, h.id, {
+      bancoId: banco.id,
+      tipo: "RENDA_FIXA",
+      produto: "CDB Banco X",
+      valorAtualCentavos: 100000,
+      pessoaId: isa.id,
+    });
+    if (!investimento) throw new Error("falha ao criar investimento de teste");
+    const lancamento = await criarLancamento(prismaTest, h.id, {
+      data: new Date("2026-06-10"),
+      valorCentavos: 1000,
+      bancoId: banco.id,
+      pessoaDivisaoId: isa.id,
+      pessoaPagouId: isa.id,
+    });
+
+    const marcado = await atualizarLancamento(
+      prismaTest,
+      h.id,
+      lancamento!.id,
+      {
+        pagoComResgateInvestimento: true,
+        investimentoResgateId: investimento.id,
+      },
+    );
+    expect(marcado?.pagoComResgateInvestimento).toBe(true);
+    expect(marcado?.investimentoResgateId).toBe(investimento.id);
+
+    const desmarcado = await atualizarLancamento(
+      prismaTest,
+      h.id,
+      lancamento!.id,
+      { pagoComResgateInvestimento: false, investimentoResgateId: null },
+    );
+    expect(desmarcado?.pagoComResgateInvestimento).toBe(false);
+    expect(desmarcado?.investimentoResgateId).toBeNull();
   });
 });
 

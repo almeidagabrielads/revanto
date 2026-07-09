@@ -162,7 +162,7 @@ describe("definirIntegrantes", () => {
     ]);
     const primeira = await listarPessoas(prismaTest, h.id);
     expect(
-      primeira.find((p) => p.id === familia.id)?.integrantes,
+      primeira.find((p) => p.id === familia.id)?.integrantesDoGrupo,
     ).toEqual([{ pessoaId: isa.id, peso: 100 }]);
 
     await definirIntegrantes(prismaTest, h.id, familia.id, [
@@ -170,7 +170,7 @@ describe("definirIntegrantes", () => {
       { pessoaId: gabi.id, peso: 40 },
     ]);
     const segunda = await listarPessoas(prismaTest, h.id);
-    const integrantes = segunda.find((p) => p.id === familia.id)?.integrantes;
+    const integrantes = segunda.find((p) => p.id === familia.id)?.integrantesDoGrupo;
     expect(integrantes).toHaveLength(2);
     expect(integrantes).toEqual(
       expect.arrayContaining([
