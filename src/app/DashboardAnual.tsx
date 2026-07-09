@@ -102,6 +102,17 @@ function formatarReaisCompactoComSimbolo(centavos: number): string {
   return `R$ ${formatarReaisCompacto(centavos)}`;
 }
 
+function mediaMensesConcluidos(
+  valoresPorMes: number[],
+  mesesConcluidos: number,
+): string {
+  if (mesesConcluidos === 0) return "—";
+  const soma = valoresPorMes
+    .slice(0, mesesConcluidos)
+    .reduce((total, valor) => total + valor, 0);
+  return formatarReaisCompactoComSimbolo(soma / mesesConcluidos);
+}
+
 function reaisParaCentavos(valor: string): number {
   const n = Number(valor.replace(",", "."));
   return Math.round(n * 100);
@@ -386,6 +397,14 @@ export function DashboardAnual({ ano }: { ano: number }) {
       0,
     ),
   );
+
+  const agora = new Date();
+  const mesesConcluidos =
+    ano < agora.getFullYear()
+      ? 12
+      : ano === agora.getFullYear()
+        ? agora.getMonth()
+        : 0;
 
   const mesMaisCaro = totalConsolidadoPorMes.reduce(
     (maiorIdx, valor, idx) =>
@@ -753,6 +772,9 @@ export function DashboardAnual({ ano }: { ano: number }) {
                     {m}
                   </th>
                 ))}
+                <th className="border-outline-variant border-l p-2 text-right">
+                  Média
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -777,33 +799,46 @@ export function DashboardAnual({ ano }: { ano: number }) {
                           {formatarReaisCompactoComSimbolo(total)}
                         </td>
                       ))}
+                      <td className="data-tabular text-on-surface border-outline-variant border-l p-2 text-right font-semibold">
+                        {mediaMensesConcluidos(subtotalPorMes, mesesConcluidos)}
+                      </td>
                     </tr>
-                    {itens.map((item) => (
-                      <tr
-                        key={chave(item.categoriaId, item.subcategoriaId)}
-                        className="border-outline-variant/60 border-b"
-                      >
-                        <td className="pl-lg text-on-surface-variant p-2">
-                          {item.subcategoriaId
-                            ? (nomeSubcategoria.get(item.subcategoriaId) ??
-                              item.subcategoriaId)
-                            : "Geral"}
-                        </td>
-                        {item.meses.map((mes, idx) => (
-                          <td
-                            key={idx}
-                            className={`data-tabular p-2 text-right ${
-                              mes.planejadoCentavos > 0 &&
-                              mes.realCentavos > mes.planejadoCentavos
-                                ? "text-danger font-semibold"
-                                : "text-on-surface"
-                            }`}
-                          >
-                            {formatarReaisCompactoComSimbolo(mes.realCentavos)}
+                    {itens.map((item) => {
+                      const realPorMes = item.meses.map(
+                        (mes) => mes.realCentavos,
+                      );
+                      return (
+                        <tr
+                          key={chave(item.categoriaId, item.subcategoriaId)}
+                          className="border-outline-variant/60 border-b"
+                        >
+                          <td className="pl-lg text-on-surface-variant p-2">
+                            {item.subcategoriaId
+                              ? (nomeSubcategoria.get(item.subcategoriaId) ??
+                                item.subcategoriaId)
+                              : "Geral"}
                           </td>
-                        ))}
-                      </tr>
-                    ))}
+                          {item.meses.map((mes, idx) => (
+                            <td
+                              key={idx}
+                              className={`data-tabular p-2 text-right ${
+                                mes.planejadoCentavos > 0 &&
+                                mes.realCentavos > mes.planejadoCentavos
+                                  ? "text-danger font-semibold"
+                                  : "text-on-surface"
+                              }`}
+                            >
+                              {formatarReaisCompactoComSimbolo(
+                                mes.realCentavos,
+                              )}
+                            </td>
+                          ))}
+                          <td className="data-tabular text-on-surface-variant border-outline-variant border-l p-2 text-right">
+                            {mediaMensesConcluidos(realPorMes, mesesConcluidos)}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </Fragment>
                 );
               })}
@@ -817,6 +852,12 @@ export function DashboardAnual({ ano }: { ano: number }) {
                     {formatarReaisCompactoComSimbolo(total)}
                   </td>
                 ))}
+                <td className="data-tabular text-on-surface border-outline-variant border-l p-2 text-right">
+                  {mediaMensesConcluidos(
+                    totalConsolidadoPorMes,
+                    mesesConcluidos,
+                  )}
+                </td>
               </tr>
             </tbody>
           </table>
