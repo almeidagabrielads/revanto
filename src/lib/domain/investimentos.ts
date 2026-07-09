@@ -1,5 +1,6 @@
 import * as z from "zod";
 import type { PrismaClient } from "@/generated/prisma/client";
+import { primeiroDiaMes } from "./receitas";
 
 export const TipoInvestimentoValues = [
   "RENDA_FIXA",
@@ -51,7 +52,12 @@ export type AtualizarInvestimentoInput = z.infer<
 export function listarInvestimentos(
   prisma: PrismaClient,
   householdId: string,
-  opts: { pessoaId?: string; bancoId?: string; tipo?: string } = {},
+  opts: {
+    pessoaId?: string;
+    bancoId?: string;
+    tipo?: string;
+    incluirFinalizados?: boolean;
+  } = {},
 ) {
   return prisma.investimento.findMany({
     where: {
@@ -59,6 +65,7 @@ export function listarInvestimentos(
       ...(opts.pessoaId ? { pessoaId: opts.pessoaId } : {}),
       ...(opts.bancoId ? { bancoId: opts.bancoId } : {}),
       ...(opts.tipo ? { tipo: opts.tipo as never } : {}),
+      ...(opts.incluirFinalizados ? {} : { status: "ATIVO" }),
     },
     orderBy: { produto: "asc" },
   });
@@ -138,15 +145,122 @@ export async function atualizarInvestimento(
   });
 }
 
-export async function removerInvestimento(
+// ─── Finalização de investimentos ──────────────────────────────────────────
+//
+// Um investimento nunca é apagado: ele é resgatado. O valor resgatado que
+// não for reinvestido vira uma Receita (subtipo INVESTIMENTO); a parte
+// reinvestida cria um novo Investimento vinculado ao original por
+// investimentoOrigemId, preservando a cadeia histórica.
+
+export const FinalizarInvestimentoSchema = z
+  .object({
+    valorResgatadoCentavos: z.number().int().nonnegative(),
+    valorReinvestidoCentavos: z.number().int().nonnegative().default(0),
+    criarReceita: z.boolean().default(true),
+    mesReceita: z.coerce.date().optional(),
+    novoInvestimento: z
+      .object({
+        bancoId: z.string().trim().min(1, "Banco é obrigatório."),
+        tipo: z.enum(TipoInvestimentoValues),
+        produto: z.string().trim().min(1, "Produto é obrigatório."),
+        vencimento: z.coerce.date().nullish(),
+        liquidezDias: z.number().int().nonnegative().nullish(),
+        observacao: z.string().trim().nullish(),
+      })
+      .refine((data) => !(data.vencimento && data.liquidezDias != null), {
+        message: "Informe apenas vencimento ou liquidezDias, não ambos.",
+        path: ["vencimento"],
+      })
+      .optional(),
+  })
+  .refine(
+    (data) => data.valorReinvestidoCentavos <= data.valorResgatadoCentavos,
+    {
+      message: "Valor reinvestido não pode ser maior que o valor resgatado.",
+      path: ["valorReinvestidoCentavos"],
+    },
+  )
+  .refine(
+    (data) => data.valorReinvestidoCentavos === 0 || !!data.novoInvestimento,
+    {
+      message: "Dados do novo investimento são obrigatórios ao reinvestir.",
+      path: ["novoInvestimento"],
+    },
+  );
+
+export type FinalizarInvestimentoInput = z.infer<
+  typeof FinalizarInvestimentoSchema
+>;
+
+export class InvestimentoJaFinalizadoError extends Error {
+  constructor() {
+    super("Investimento já finalizado.");
+    this.name = "InvestimentoJaFinalizadoError";
+  }
+}
+
+export async function finalizarInvestimento(
   prisma: PrismaClient,
   householdId: string,
   id: string,
+  input: FinalizarInvestimentoInput,
 ) {
   const existente = await buscarInvestimento(prisma, householdId, id);
   if (!existente) return null;
 
-  return prisma.investimento.delete({ where: { id } });
+  if (existente.status === "FINALIZADO") {
+    throw new InvestimentoJaFinalizadoError();
+  }
+
+  const valorLiquidoCentavos =
+    input.valorResgatadoCentavos - input.valorReinvestidoCentavos;
+
+  return prisma.$transaction(async (tx) => {
+    const novoInvestimento =
+      input.valorReinvestidoCentavos > 0 && input.novoInvestimento
+        ? await tx.investimento.create({
+            data: {
+              bancoId: input.novoInvestimento.bancoId,
+              tipo: input.novoInvestimento.tipo,
+              produto: input.novoInvestimento.produto,
+              valorAtualCentavos: input.valorReinvestidoCentavos,
+              vencimento: input.novoInvestimento.vencimento ?? null,
+              liquidezDias: input.novoInvestimento.liquidezDias ?? null,
+              observacao: input.novoInvestimento.observacao ?? null,
+              pessoaId: existente.pessoaId,
+              householdId,
+              investimentoOrigemId: existente.id,
+            },
+          })
+        : null;
+
+    const receita =
+      input.criarReceita && valorLiquidoCentavos > 0
+        ? await tx.receita.create({
+            data: {
+              pessoaId: existente.pessoaId,
+              subtipo: "INVESTIMENTO",
+              descricao: `Resgate: ${existente.produto}`,
+              valorCentavos: valorLiquidoCentavos,
+              mes: primeiroDiaMes(input.mesReceita ?? new Date()),
+              householdId,
+              investimentoId: existente.id,
+            },
+          })
+        : null;
+
+    const investimento = await tx.investimento.update({
+      where: { id },
+      data: {
+        status: "FINALIZADO",
+        finalizadoEm: new Date(),
+        valorResgatadoCentavos: input.valorResgatadoCentavos,
+        valorReinvestidoCentavos: input.valorReinvestidoCentavos,
+      },
+    });
+
+    return { investimento, novoInvestimento, receita };
+  });
 }
 
 // ─── Liquidez consolidada (RF15) ────────────────────────────────────────────
@@ -204,6 +318,7 @@ export async function liquidezConsolidada(
   const investimentos = await prisma.investimento.findMany({
     where: {
       householdId,
+      status: "ATIVO",
       ...(opts.pessoaId ? { pessoaId: opts.pessoaId } : {}),
     },
   });

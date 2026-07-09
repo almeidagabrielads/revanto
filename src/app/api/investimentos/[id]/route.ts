@@ -6,7 +6,6 @@ import {
   AtualizarInvestimentoSchema,
   atualizarInvestimento,
   buscarInvestimento,
-  removerInvestimento,
 } from "@/lib/domain/investimentos";
 
 export async function GET(
@@ -70,25 +69,4 @@ export async function PATCH(
     );
   }
   return NextResponse.json(investimento);
-}
-
-export async function DELETE(
-  request: NextRequest,
-  ctx: { params: Promise<{ id: string }> },
-) {
-  const session = verifySession(request);
-  if (!session) {
-    return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
-  }
-
-  const { id } = await ctx.params;
-  const investimento = await removerInvestimento(prisma, session.householdId, id);
-  if (!investimento) {
-    return NextResponse.json(
-      { error: "Investimento não encontrado." },
-      { status: 404 },
-    );
-  }
-
-  return NextResponse.json({ success: true });
 }

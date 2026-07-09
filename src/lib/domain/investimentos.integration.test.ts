@@ -3,12 +3,13 @@ import { limparBanco, prismaTest } from "@/test/prisma";
 import { criarPessoa } from "./pessoas";
 import { criarBanco } from "./bancos";
 import {
+  InvestimentoJaFinalizadoError,
   atualizarInvestimento,
   buscarInvestimento,
   criarInvestimento,
+  finalizarInvestimento,
   liquidezConsolidada,
   listarInvestimentos,
-  removerInvestimento,
 } from "./investimentos";
 
 async function criarHousehold(nome = "Isa & Gabi") {
@@ -179,8 +180,8 @@ describe("atualizarInvestimento", () => {
   });
 });
 
-describe("removerInvestimento", () => {
-  it("remove fisicamente o investimento", async () => {
+describe("finalizarInvestimento", () => {
+  it("finaliza sem reinvestir e cria receita com o valor cheio", async () => {
     const { household, isa, banco } = await montarBase();
     const investimento = await criarInvestimento(prismaTest, household.id, {
       bancoId: banco.id,
@@ -190,17 +191,113 @@ describe("removerInvestimento", () => {
       pessoaId: isa.id,
     });
 
-    const removido = await removerInvestimento(
+    const resultado = await finalizarInvestimento(
       prismaTest,
       household.id,
       investimento!.id,
+      { valorResgatadoCentavos: 100000, valorReinvestidoCentavos: 0, criarReceita: true },
     );
-    expect(removido).not.toBeNull();
+
+    expect(resultado?.investimento.status).toBe("FINALIZADO");
+    expect(resultado?.investimento.finalizadoEm).not.toBeNull();
+    expect(resultado?.novoInvestimento).toBeNull();
+    expect(resultado?.receita?.valorCentavos).toBe(100000);
+    expect(resultado?.receita?.subtipo).toBe("INVESTIMENTO");
+    expect(resultado?.receita?.investimentoId).toBe(investimento!.id);
 
     const buscado = await prismaTest.investimento.findUnique({
       where: { id: investimento!.id },
     });
-    expect(buscado).toBeNull();
+    expect(buscado).not.toBeNull();
+  });
+
+  it("finaliza reinvestindo parte do valor: cria novo investimento vinculado e receita com valor líquido", async () => {
+    const { household, isa, banco } = await montarBase();
+    const investimento = await criarInvestimento(prismaTest, household.id, {
+      bancoId: banco.id,
+      tipo: "RENDA_FIXA",
+      produto: "CDB Original",
+      valorAtualCentavos: 100000,
+      pessoaId: isa.id,
+    });
+
+    const resultado = await finalizarInvestimento(
+      prismaTest,
+      household.id,
+      investimento!.id,
+      {
+        valorResgatadoCentavos: 100000,
+        valorReinvestidoCentavos: 60000,
+        criarReceita: true,
+        novoInvestimento: {
+          bancoId: banco.id,
+          tipo: "RENDA_FIXA",
+          produto: "CDB Novo",
+        },
+      },
+    );
+
+    expect(resultado?.novoInvestimento?.valorAtualCentavos).toBe(60000);
+    expect(resultado?.novoInvestimento?.investimentoOrigemId).toBe(
+      investimento!.id,
+    );
+    expect(resultado?.receita?.valorCentavos).toBe(40000);
+  });
+
+  it("não cria receita quando criarReceita é false", async () => {
+    const { household, isa, banco } = await montarBase();
+    const investimento = await criarInvestimento(prismaTest, household.id, {
+      bancoId: banco.id,
+      tipo: "RENDA_FIXA",
+      produto: "Teste",
+      valorAtualCentavos: 100000,
+      pessoaId: isa.id,
+    });
+
+    const resultado = await finalizarInvestimento(
+      prismaTest,
+      household.id,
+      investimento!.id,
+      { valorResgatadoCentavos: 100000, valorReinvestidoCentavos: 0, criarReceita: false },
+    );
+
+    expect(resultado?.receita).toBeNull();
+  });
+
+  it("lança erro ao tentar finalizar um investimento já finalizado", async () => {
+    const { household, isa, banco } = await montarBase();
+    const investimento = await criarInvestimento(prismaTest, household.id, {
+      bancoId: banco.id,
+      tipo: "RENDA_FIXA",
+      produto: "Teste",
+      valorAtualCentavos: 100000,
+      pessoaId: isa.id,
+    });
+
+    await finalizarInvestimento(prismaTest, household.id, investimento!.id, {
+      valorResgatadoCentavos: 100000,
+      valorReinvestidoCentavos: 0,
+      criarReceita: false,
+    });
+
+    await expect(
+      finalizarInvestimento(prismaTest, household.id, investimento!.id, {
+        valorResgatadoCentavos: 100000,
+        valorReinvestidoCentavos: 0,
+        criarReceita: false,
+      }),
+    ).rejects.toThrow(InvestimentoJaFinalizadoError);
+  });
+
+  it("retorna null para investimento inexistente", async () => {
+    const { household } = await montarBase();
+    const resultado = await finalizarInvestimento(
+      prismaTest,
+      household.id,
+      "id-fake",
+      { valorResgatadoCentavos: 100, valorReinvestidoCentavos: 0, criarReceita: false },
+    );
+    expect(resultado).toBeNull();
   });
 });
 
@@ -278,6 +375,37 @@ describe("listarInvestimentos (filtros)", () => {
 
     expect(investimentos).toHaveLength(1);
     expect(investimentos[0].produto).toBe("FGTS");
+  });
+
+  it("exclui finalizados por padrão e inclui com incluirFinalizados", async () => {
+    const { household, isa, banco } = await montarBase();
+    const ativo = await criarInvestimento(prismaTest, household.id, {
+      bancoId: banco.id,
+      tipo: "RENDA_FIXA",
+      produto: "Ativo",
+      valorAtualCentavos: 1000,
+      pessoaId: isa.id,
+    });
+    const finalizado = await criarInvestimento(prismaTest, household.id, {
+      bancoId: banco.id,
+      tipo: "RENDA_FIXA",
+      produto: "Finalizado",
+      valorAtualCentavos: 2000,
+      pessoaId: isa.id,
+    });
+    await finalizarInvestimento(prismaTest, household.id, finalizado!.id, {
+      valorResgatadoCentavos: 2000,
+      valorReinvestidoCentavos: 0,
+      criarReceita: false,
+    });
+
+    const somenteAtivos = await listarInvestimentos(prismaTest, household.id);
+    expect(somenteAtivos.map((i) => i.id)).toEqual([ativo!.id]);
+
+    const todos = await listarInvestimentos(prismaTest, household.id, {
+      incluirFinalizados: true,
+    });
+    expect(todos).toHaveLength(2);
   });
 });
 

@@ -19,6 +19,7 @@ export async function GET(request: NextRequest) {
     pessoaId: params.get("pessoaId") ?? undefined,
     bancoId: params.get("bancoId") ?? undefined,
     tipo: params.get("tipo") ?? undefined,
+    incluirFinalizados: params.get("incluirFinalizados") === "true",
   });
   return NextResponse.json(investimentos);
 }

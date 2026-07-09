@@ -17,6 +17,7 @@ model Household {
   bancos               Banco[]
   categorias           Categoria[]
   fechamentosAnuais    FechamentoAnual[]
+  integrantesGrupo     IntegranteGrupo[]
   investimentos        Investimento[]
   lancamentos          Lancamento[]
   orcamentos           OrcamentoPlanejado[]
@@ -69,26 +70,43 @@ model AtividadeLog {
 }
 
 model Pessoa {
-  id                 String               @id @default(cuid())
-  nome               String
-  tipo               TipoPessoa
-  // Peso relativo usado para ratear gastos CASAL/FAMILIA entre as pessoas
-  // INDIVIDUAL do household (proporcional, não uma % absoluta).
-  pesoDivisao        Int                  @default(100)
-  householdId        String
-  createdAt          DateTime             @default(now())
-  updatedAt          DateTime             @updatedAt
-  acertosDevidos     AcertoContas[]       @relation("AcertoDe")
-  acertosRecebidos   AcertoContas[]       @relation("AcertoPara")
-  investimentos      Investimento[]
-  lancamentosDivisao Lancamento[]         @relation("LancamentoDivisao")
-  lancamentosPagou   Lancamento[]         @relation("LancamentoPagou")
-  orcamentos         OrcamentoPlanejado[]
-  household          Household            @relation(fields: [householdId], references: [id])
-  posicoesPatrimonio PosicaoPatrimonio[]
-  receitas           Receita[]
+  id                        String               @id @default(cuid())
+  nome                      String
+  tipo                      TipoPessoa
+  householdId               String
+  createdAt                 DateTime             @default(now())
+  updatedAt                 DateTime             @updatedAt
+  acertosDevidos            AcertoContas[]       @relation("AcertoDe")
+  acertosRecebidos          AcertoContas[]       @relation("AcertoPara")
+  investimentos             Investimento[]
+  lancamentosDivisao        Lancamento[]         @relation("LancamentoDivisao")
+  lancamentosPagou          Lancamento[]         @relation("LancamentoPagou")
+  orcamentos                OrcamentoPlanejado[]
+  household                 Household            @relation(fields: [householdId], references: [id])
+  posicoesPatrimonio        PosicaoPatrimonio[]
+  receitas                  Receita[]
+  integrantesDoGrupo        IntegranteGrupo[]    @relation("IntegranteGrupo_grupoIdToPessoa")
+  participacoesComoIntegrante IntegranteGrupo[]  @relation("IntegranteGrupo_pessoaIdToPessoa")
 
   @@unique([householdId, nome])
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model IntegranteGrupo {
+  id                                      String    @id @default(cuid())
+  grupoId                                 String
+  pessoaId                                String
+  peso                                    Int       @default(100)
+  householdId                             String
+  createdAt                               DateTime  @default(now())
+  updatedAt                               DateTime  @updatedAt
+  grupo                                   Pessoa    @relation("IntegranteGrupo_grupoIdToPessoa", fields: [grupoId], references: [id], onDelete: Cascade)
+  household                               Household @relation(fields: [householdId], references: [id])
+  pessoa                                  Pessoa    @relation("IntegranteGrupo_pessoaIdToPessoa", fields: [pessoaId], references: [id], onDelete: Cascade)
+
+  @@unique([grupoId, pessoaId])
+  @@index([householdId])
+  @@index([pessoaId])
 }
 
 model AcertoContas {
@@ -189,17 +207,19 @@ model Lancamento {
 }
 
 model Receita {
-  id            String         @id @default(cuid())
-  pessoaId      String
-  subtipo       SubtipoReceita
-  descricao     String?
-  valorCentavos Int
-  mes           DateTime       @db.Date
-  householdId   String
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  household     Household      @relation(fields: [householdId], references: [id])
-  pessoa        Pessoa         @relation(fields: [pessoaId], references: [id])
+  id             String         @id @default(cuid())
+  pessoaId       String
+  subtipo        SubtipoReceita
+  descricao      String?
+  valorCentavos  Int
+  mes            DateTime       @db.Date
+  householdId    String
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  investimentoId String?        @unique
+  household      Household      @relation(fields: [householdId], references: [id])
+  investimento   Investimento?  @relation("ResgateInvestimento", fields: [investimentoId], references: [id])
+  pessoa         Pessoa         @relation(fields: [pessoaId], references: [id])
 
   @@index([householdId, mes])
 }
@@ -225,22 +245,30 @@ model OrcamentoPlanejado {
 }
 
 model Investimento {
-  id                 String                @id @default(cuid())
-  bancoId            String
-  tipo               TipoInvestimento
-  produto            String
-  valorAtualCentavos Int
-  vencimento         DateTime?             @db.Date
-  liquidezDias       Int?
-  observacao         String?
-  pessoaId           String
-  householdId        String
-  createdAt          DateTime              @default(now())
-  updatedAt          DateTime              @updatedAt
-  banco              Banco                 @relation(fields: [bancoId], references: [id])
-  household          Household             @relation(fields: [householdId], references: [id])
-  pessoa             Pessoa                @relation(fields: [pessoaId], references: [id])
-  posicoesMensais    PosicaoInvestimento[]
+  id                       String                @id @default(cuid())
+  bancoId                  String
+  tipo                     TipoInvestimento
+  produto                  String
+  valorAtualCentavos       Int
+  vencimento               DateTime?             @db.Date
+  liquidezDias             Int?
+  observacao               String?
+  pessoaId                 String
+  householdId              String
+  createdAt                DateTime              @default(now())
+  updatedAt                DateTime              @updatedAt
+  status                   StatusInvestimento    @default(ATIVO)
+  finalizadoEm             DateTime?
+  valorResgatadoCentavos   Int?
+  valorReinvestidoCentavos Int?
+  investimentoOrigemId     String?
+  banco                    Banco                 @relation(fields: [bancoId], references: [id])
+  household                Household             @relation(fields: [householdId], references: [id])
+  pessoa                   Pessoa                @relation(fields: [pessoaId], references: [id])
+  investimentoOrigem       Investimento?         @relation("Reinvestimento", fields: [investimentoOrigemId], references: [id])
+  reinvestimentos          Investimento[]        @relation("Reinvestimento")
+  posicoesMensais          PosicaoInvestimento[]
+  receitaResgate           Receita?              @relation("ResgateInvestimento")
 
   @@index([householdId])
   @@index([householdId, pessoaId])
@@ -323,6 +351,11 @@ enum TipoInvestimento {
   FUNDO
   FGTS
   OUTRO
+}
+
+enum StatusInvestimento {
+  ATIVO
+  FINALIZADO
 }
 
 enum TipoBanco {

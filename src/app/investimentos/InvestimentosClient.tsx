@@ -3,20 +3,21 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { RelatorioInvestimentos } from "./RelatorioInvestimentos";
 import { PosicaoMensalInline } from "./PosicaoMensalInline";
+import { FinalizarInvestimentoModal } from "./FinalizarInvestimentoModal";
 import { useConfirmDialog } from "../components/ConfirmDialog";
 import { ColumnHeader } from "../components/ColumnHeader";
 import { useTabela, type ColunaTabela } from "../components/useTabela";
 
-const TIPOS_INVESTIMENTO = [
+export const TIPOS_INVESTIMENTO = [
   { value: "RENDA_FIXA", label: "Renda Fixa" },
   { value: "FUNDO", label: "Fundo de Investimento" },
   { value: "FGTS", label: "FGTS" },
   { value: "OUTRO", label: "Outro" },
 ] as const;
 
-type TipoInvestimento = (typeof TIPOS_INVESTIMENTO)[number]["value"];
+export type TipoInvestimento = (typeof TIPOS_INVESTIMENTO)[number]["value"];
 
-function labelTipo(tipo: string): string {
+export function labelTipo(tipo: string): string {
   return TIPOS_INVESTIMENTO.find((t) => t.value === tipo)?.label ?? tipo;
 }
 
@@ -30,9 +31,9 @@ const FAIXAS_LABEL: Record<string, string> = {
   INDEFINIDO: "Sem prazo definido",
 };
 
-type Banco = { id: string; nome: string; ativo: boolean };
-type Pessoa = { id: string; nome: string; tipo: string };
-type Investimento = {
+export type Banco = { id: string; nome: string; ativo: boolean };
+export type Pessoa = { id: string; nome: string; tipo: string };
+export type Investimento = {
   id: string;
   bancoId: string;
   tipo: TipoInvestimento;
@@ -42,6 +43,7 @@ type Investimento = {
   liquidezDias: number | null;
   observacao: string | null;
   pessoaId: string;
+  status: "ATIVO" | "FINALIZADO";
 };
 type FaixaLiquidez = {
   faixa: string;
@@ -54,18 +56,18 @@ type PosicaoMensal = {
   valorCentavos: number;
 };
 
-async function parseErro(response: Response): Promise<string> {
+export async function parseErro(response: Response): Promise<string> {
   const body = await response.json().catch(() => null);
   if (typeof body?.error === "string") return body.error;
   return "Não foi possível completar a operação.";
 }
 
-function reaisParaCentavos(valor: string): number {
+export function reaisParaCentavos(valor: string): number {
   const n = Number(valor.replace(",", "."));
   return Math.round(n * 100);
 }
 
-function formatarReais(centavos: number): string {
+export function formatarReais(centavos: number): string {
   return (centavos / 100).toLocaleString("pt-BR", {
     style: "currency",
     currency: "BRL",
@@ -111,7 +113,7 @@ function IconePlusCirculo() {
   );
 }
 
-function IconeLixeira() {
+function IconeFinalizar() {
   return (
     <svg
       className="h-4 w-4"
@@ -122,11 +124,7 @@ function IconeLixeira() {
       strokeLinecap="round"
       strokeLinejoin="round"
     >
-      <path d="M3 6h18" />
-      <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
-      <path d="M10 11v6" />
-      <path d="M14 11v6" />
+      <path d="M20 6 9 17l-5-5" />
     </svg>
   );
 }
@@ -174,7 +172,10 @@ export function InvestimentosClient() {
   const [reloadToken, setReloadToken] = useState(0);
   const [aba, setAba] = useState<"CARTEIRA" | "RELATORIOS">("RELATORIOS");
   const [toast, setToast] = useState<string | null>(null);
-  const { confirmar, dialog: dialogConfirmacao } = useConfirmDialog();
+  const [mostrarFinalizados, setMostrarFinalizados] = useState(false);
+  const [investimentoParaFinalizar, setInvestimentoParaFinalizar] =
+    useState<Investimento | null>(null);
+  const { dialog: dialogConfirmacao } = useConfirmDialog();
 
   const anoAtual = new Date().getUTCFullYear();
   const [investimentoExpandidoId, setInvestimentoExpandidoId] = useState<
@@ -221,8 +222,9 @@ export function InvestimentosClient() {
 
   useEffect(() => {
     let cancelado = false;
+    const query = mostrarFinalizados ? "?incluirFinalizados=true" : "";
     Promise.all([
-      fetch("/api/investimentos").then((r) => (r.ok ? r.json() : null)),
+      fetch(`/api/investimentos${query}`).then((r) => (r.ok ? r.json() : null)),
       fetch("/api/investimentos/liquidez").then((r) =>
         r.ok ? r.json() : null,
       ),
@@ -243,7 +245,7 @@ export function InvestimentosClient() {
     return () => {
       cancelado = true;
     };
-  }, [reloadToken]);
+  }, [reloadToken, mostrarFinalizados]);
 
   useEffect(() => {
     let cancelado = false;
@@ -289,22 +291,9 @@ export function InvestimentosClient() {
     recarregar();
   }
 
-  async function removerInvestimento(inv: Investimento) {
-    if (
-      !(await confirmar(
-        `Remover "${inv.produto}"? Essa ação não pode ser desfeita.`,
-      ))
-    ) {
-      return;
-    }
-    setErro(null);
-    const response = await fetch(`/api/investimentos/${inv.id}`, {
-      method: "DELETE",
-    });
-    if (!response.ok) {
-      setErro(await parseErro(response));
-      return;
-    }
+  function onInvestimentoFinalizado() {
+    setInvestimentoParaFinalizar(null);
+    setToast("Investimento finalizado com sucesso!");
     recarregar();
   }
 
@@ -383,6 +372,15 @@ export function InvestimentosClient() {
   return (
     <div className="gap-lg flex flex-col">
       {dialogConfirmacao}
+
+      {investimentoParaFinalizar && (
+        <FinalizarInvestimentoModal
+          investimento={investimentoParaFinalizar}
+          bancos={bancos}
+          onClose={() => setInvestimentoParaFinalizar(null)}
+          onFinalizado={onInvestimentoFinalizado}
+        />
+      )}
 
       {toast && (
         <div className="bottom-lg right-lg bg-primary px-md text-on-primary fixed z-50 flex items-center gap-2 rounded-xl py-2.5 text-sm font-medium shadow-lg">
@@ -646,25 +644,35 @@ export function InvestimentosClient() {
                   : "itens cadastrados"}
               </span>
             </div>
-            <div className="gap-sm flex items-center">
-              <label
-                className="text-on-surface-variant text-xs font-semibold"
-                htmlFor="ano-posicoes"
-              >
-                Posições do ano
+            <div className="gap-md flex items-center">
+              <label className="gap-1.5 text-on-surface-variant flex cursor-pointer items-center text-xs font-semibold">
+                <input
+                  type="checkbox"
+                  checked={mostrarFinalizados}
+                  onChange={(e) => setMostrarFinalizados(e.target.checked)}
+                />
+                Mostrar finalizados
               </label>
-              <select
-                id="ano-posicoes"
-                className="border-outline-variant bg-surface-container-lowest rounded-lg border px-2 py-1 text-sm"
-                value={anoPosicoes}
-                onChange={(e) => setAnoPosicoes(Number(e.target.value))}
-              >
-                {[anoAtual, anoAtual - 1, anoAtual - 2].map((a) => (
-                  <option key={a} value={a}>
-                    {a}
-                  </option>
-                ))}
-              </select>
+              <div className="gap-sm flex items-center">
+                <label
+                  className="text-on-surface-variant text-xs font-semibold"
+                  htmlFor="ano-posicoes"
+                >
+                  Posições do ano
+                </label>
+                <select
+                  id="ano-posicoes"
+                  className="border-outline-variant bg-surface-container-lowest rounded-lg border px-2 py-1 text-sm"
+                  value={anoPosicoes}
+                  onChange={(e) => setAnoPosicoes(Number(e.target.value))}
+                >
+                  {[anoAtual, anoAtual - 1, anoAtual - 2].map((a) => (
+                    <option key={a} value={a}>
+                      {a}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
           </div>
           <p className="text-on-surface-variant px-lg pb-md text-xs">
@@ -767,8 +775,13 @@ export function InvestimentosClient() {
                           {labelTipo(inv.tipo)}
                         </td>
                         <td className="p-md">
-                          <div className="text-on-surface font-medium">
+                          <div className="text-on-surface flex items-center gap-2 font-medium">
                             {inv.produto}
+                            {inv.status === "FINALIZADO" && (
+                              <span className="bg-surface-container-high text-on-surface-variant rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase">
+                                Finalizado
+                              </span>
+                            )}
                           </div>
                           {inv.observacao && (
                             <div className="text-on-surface-variant text-xs">
@@ -787,17 +800,19 @@ export function InvestimentosClient() {
                         </td>
                         <td className="p-md">
                           <div className="flex justify-end">
-                            <button
-                              className="text-danger hover:bg-danger-container rounded-full p-1.5 transition-colors"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                removerInvestimento(inv);
-                              }}
-                              title="Remover"
-                              aria-label="Remover"
-                            >
-                              <IconeLixeira />
-                            </button>
+                            {inv.status === "ATIVO" && (
+                              <button
+                                className="text-primary hover:bg-primary-container rounded-full p-1.5 transition-colors"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setInvestimentoParaFinalizar(inv);
+                                }}
+                                title="Finalizar"
+                                aria-label="Finalizar"
+                              >
+                                <IconeFinalizar />
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>

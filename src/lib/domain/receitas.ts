@@ -45,7 +45,7 @@ export type CriarReceitaInput = z.infer<typeof CriarReceitaSchema>;
 export type AtualizarReceitaInput = z.infer<typeof AtualizarReceitaSchema>;
 
 // Normaliza para o 1º dia do mês em UTC — representa o mês de competência.
-function primeiroDiaMes(data: Date): Date {
+export function primeiroDiaMes(data: Date): Date {
   return new Date(Date.UTC(data.getUTCFullYear(), data.getUTCMonth(), 1));
 }
 
