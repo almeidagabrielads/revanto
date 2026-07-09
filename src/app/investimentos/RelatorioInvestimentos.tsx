@@ -15,6 +15,54 @@ const TIPOS_INVESTIMENTO = [
   { value: "OUTRO", label: "Outro", cor: "var(--color-outline)" },
 ] as const;
 
+// Paleta categórica para agrupamentos dinâmicos (banco, titular) cujo número
+// de categorias não é fixo. O tom cinza (outline) fica reservado para o
+// bucket "Outros" — nunca geramos uma nova cor além destas.
+const PALETTE_CATEGORICA = [
+  "var(--color-primary)",
+  "var(--color-secondary)",
+  "var(--color-tertiary-container)",
+  "var(--color-on-tertiary-container)",
+];
+const COR_OUTROS = "var(--color-outline)";
+
+type GrupoAlocacao = {
+  chave: string;
+  label: string;
+  cor: string;
+  totalCentavos: number;
+};
+
+function agruparComCores(
+  grupos: { chave: string; label: string; totalCentavos: number }[],
+): GrupoAlocacao[] {
+  const ordenados = [...grupos]
+    .filter((g) => g.totalCentavos > 0)
+    .sort((a, b) => b.totalCentavos - a.totalCentavos);
+
+  if (ordenados.length <= PALETTE_CATEGORICA.length) {
+    return ordenados.map((g, i) => ({ ...g, cor: PALETTE_CATEGORICA[i] }));
+  }
+
+  const limite = PALETTE_CATEGORICA.length - 1;
+  const principais = ordenados
+    .slice(0, limite)
+    .map((g, i) => ({ ...g, cor: PALETTE_CATEGORICA[i] }));
+  const totalOutros = ordenados
+    .slice(limite)
+    .reduce((soma, g) => soma + g.totalCentavos, 0);
+
+  return [
+    ...principais,
+    {
+      chave: "OUTROS",
+      label: "Outros",
+      totalCentavos: totalOutros,
+      cor: COR_OUTROS,
+    },
+  ];
+}
+
 type Banco = { id: string; nome: string };
 type Pessoa = { id: string; nome: string };
 type Investimento = {
@@ -88,6 +136,50 @@ function Donut({ fatias }: { fatias: { cor: string; valor: number }[] }) {
             );
           })}
     </svg>
+  );
+}
+
+function AlocacaoCard({
+  titulo,
+  grupos,
+}: {
+  titulo: string;
+  grupos: GrupoAlocacao[];
+}) {
+  return (
+    <section className="gap-md border-outline-variant bg-surface-container-lowest p-lg flex flex-col rounded-xl border shadow-sm">
+      <h2 className="text-on-surface text-base font-bold">{titulo}</h2>
+      {grupos.length > 0 ? (
+        <>
+          <div className="flex justify-center">
+            <Donut
+              fatias={grupos.map((g) => ({
+                cor: g.cor,
+                valor: g.totalCentavos,
+              }))}
+            />
+          </div>
+          <ul className="flex flex-col gap-2">
+            {grupos.map((g) => (
+              <li key={g.chave} className="flex items-center gap-2 text-sm">
+                <span
+                  className="h-2.5 w-2.5 rounded-full"
+                  style={{ backgroundColor: g.cor }}
+                />
+                <span className="text-on-surface-variant">{g.label}</span>
+                <span className="data-tabular text-on-surface ml-auto font-medium">
+                  {formatarReais(g.totalCentavos)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : (
+        <p className="text-on-surface-variant text-sm">
+          Nenhum investimento cadastrado.
+        </p>
+      )}
+    </section>
   );
 }
 
@@ -203,6 +295,51 @@ export function RelatorioInvestimentos({
     [pessoas],
   );
 
+  const gruposClasse = useMemo<GrupoAlocacao[]>(
+    () =>
+      grupos.map((g) => ({
+        chave: g.value,
+        label: g.label,
+        cor: g.cor,
+        totalCentavos: g.totalCentavos,
+      })),
+    [grupos],
+  );
+
+  const gruposBanco = useMemo(() => {
+    const totais = new Map<string, number>();
+    for (const inv of investimentos) {
+      totais.set(
+        inv.bancoId,
+        (totais.get(inv.bancoId) ?? 0) + inv.valorAtualCentavos,
+      );
+    }
+    return agruparComCores(
+      [...totais.entries()].map(([bancoId, totalCentavos]) => ({
+        chave: bancoId,
+        label: bancosPorId.get(bancoId)?.nome ?? "—",
+        totalCentavos,
+      })),
+    );
+  }, [investimentos, bancosPorId]);
+
+  const gruposTitular = useMemo(() => {
+    const totais = new Map<string, number>();
+    for (const inv of investimentos) {
+      totais.set(
+        inv.pessoaId,
+        (totais.get(inv.pessoaId) ?? 0) + inv.valorAtualCentavos,
+      );
+    }
+    return agruparComCores(
+      [...totais.entries()].map(([pessoaId, totalCentavos]) => ({
+        chave: pessoaId,
+        label: pessoasPorId.get(pessoaId)?.nome ?? "—",
+        totalCentavos,
+      })),
+    );
+  }, [investimentos, pessoasPorId]);
+
   const colunasInvestimentos = useMemo<ColunaTabela<Investimento>[]>(
     () => [
       { chave: "classe", tipo: "opcoes", acessor: (inv) => labelTipo(inv.tipo) },
@@ -289,92 +426,60 @@ export function RelatorioInvestimentos({
         </span>
       </div>
 
-      <div className="gap-lg grid grid-cols-1 lg:grid-cols-[minmax(0,340px)_1fr]">
-        <section className="gap-md border-outline-variant bg-surface-container-lowest p-lg flex flex-col rounded-xl border shadow-sm">
-          <h2 className="text-on-surface text-base font-bold">
-            Alocação de Ativos
-          </h2>
-          {grupos.length > 0 ? (
-            <>
-              <div className="flex justify-center">
-                <Donut
-                  fatias={grupos.map((g) => ({
-                    cor: g.cor,
-                    valor: g.totalCentavos,
-                  }))}
-                />
-              </div>
-              <ul className="flex flex-col gap-2">
-                {grupos.map((g) => (
-                  <li key={g.value} className="flex items-center gap-2 text-sm">
-                    <span
-                      className="h-2.5 w-2.5 rounded-full"
-                      style={{ backgroundColor: g.cor }}
-                    />
-                    <span className="text-on-surface-variant">{g.label}</span>
-                    <span className="data-tabular text-on-surface ml-auto font-medium">
-                      {formatarReais(g.totalCentavos)}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </>
-          ) : (
-            <p className="text-on-surface-variant text-sm">
-              Nenhum investimento cadastrado.
-            </p>
-          )}
-        </section>
-
-        <section className="gap-md border-outline-variant bg-surface-container-lowest p-lg flex flex-col rounded-xl border shadow-sm">
-          <div className="flex items-center justify-between">
-            <h2 className="text-on-surface text-base font-bold">
-              Performance: Rendimento vs. CDI
-            </h2>
-            <div className="gap-md text-on-surface-variant flex items-center text-xs">
-              <span className="flex items-center gap-1">
-                <span className="bg-primary h-2 w-2 rounded-full" /> Carteira
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="bg-outline h-2 w-2 rounded-full" /> CDI
-              </span>
-            </div>
-          </div>
-          {rendimento === null ? (
-            <p className="text-on-surface-variant text-sm">Carregando…</p>
-          ) : rendimento.length > 0 ? (
-            <>
-              <GraficoRendimento linhas={rendimento} />
-              <div className="text-on-surface-variant flex justify-between text-xs">
-                {rendimento.map((l) => (
-                  <span key={l.mes}>
-                    {new Date(l.mes).toLocaleDateString("pt-BR", {
-                      month: "short",
-                      timeZone: "UTC",
-                    })}
-                  </span>
-                ))}
-              </div>
-              {ultimaLinha && (
-                <p className="text-on-surface-variant text-sm">
-                  Acumulado no ano: carteira{" "}
-                  <span className="text-on-surface font-semibold">
-                    {ultimaLinha.rendimentoAcumuladoRealPercentual.toFixed(2)}%
-                  </span>{" "}
-                  vs. CDI{" "}
-                  <span className="text-on-surface font-semibold">
-                    {ultimaLinha.cdiAcumuladoPercentual.toFixed(2)}%
-                  </span>
-                </p>
-              )}
-            </>
-          ) : (
-            <p className="text-on-surface-variant text-sm">
-              Sem posições de patrimônio lançadas em {ano}.
-            </p>
-          )}
-        </section>
+      <div className="gap-lg grid grid-cols-1 md:grid-cols-3">
+        <AlocacaoCard titulo="Alocação por Classe" grupos={gruposClasse} />
+        <AlocacaoCard titulo="Alocação por Banco" grupos={gruposBanco} />
+        <AlocacaoCard titulo="Alocação por Titular" grupos={gruposTitular} />
       </div>
+
+      <section className="gap-md border-outline-variant bg-surface-container-lowest p-lg flex flex-col rounded-xl border shadow-sm">
+        <div className="flex items-center justify-between">
+          <h2 className="text-on-surface text-base font-bold">
+            Performance: Rendimento vs. CDI
+          </h2>
+          <div className="gap-md text-on-surface-variant flex items-center text-xs">
+            <span className="flex items-center gap-1">
+              <span className="bg-primary h-2 w-2 rounded-full" /> Carteira
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="bg-outline h-2 w-2 rounded-full" /> CDI
+            </span>
+          </div>
+        </div>
+        {rendimento === null ? (
+          <p className="text-on-surface-variant text-sm">Carregando…</p>
+        ) : rendimento.length > 0 ? (
+          <>
+            <GraficoRendimento linhas={rendimento} />
+            <div className="text-on-surface-variant flex justify-between text-xs">
+              {rendimento.map((l) => (
+                <span key={l.mes}>
+                  {new Date(l.mes).toLocaleDateString("pt-BR", {
+                    month: "short",
+                    timeZone: "UTC",
+                  })}
+                </span>
+              ))}
+            </div>
+            {ultimaLinha && (
+              <p className="text-on-surface-variant text-sm">
+                Acumulado no ano: carteira{" "}
+                <span className="text-on-surface font-semibold">
+                  {ultimaLinha.rendimentoAcumuladoRealPercentual.toFixed(2)}%
+                </span>{" "}
+                vs. CDI{" "}
+                <span className="text-on-surface font-semibold">
+                  {ultimaLinha.cdiAcumuladoPercentual.toFixed(2)}%
+                </span>
+              </p>
+            )}
+          </>
+        ) : (
+          <p className="text-on-surface-variant text-sm">
+            Sem posições de patrimônio lançadas em {ano}.
+          </p>
+        )}
+      </section>
 
       <section className="gap-sm border-outline-variant bg-surface-container-lowest p-lg flex flex-col rounded-xl border shadow-sm">
         <h2 className="text-on-surface text-base font-bold">
