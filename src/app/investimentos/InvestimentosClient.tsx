@@ -5,6 +5,7 @@ import { RelatorioInvestimentos } from "./RelatorioInvestimentos";
 import { PosicaoMensalInline } from "./PosicaoMensalInline";
 import { FinalizarInvestimentoModal } from "./FinalizarInvestimentoModal";
 import { EditarInvestimentoModal } from "./EditarInvestimentoModal";
+import { NovoInvestimentoModal } from "./NovoInvestimentoModal";
 import { useConfirmDialog } from "../components/ConfirmDialog";
 import { ColumnHeader } from "../components/ColumnHeader";
 import { useTabela, type ColunaTabela } from "../components/useTabela";
@@ -86,22 +87,10 @@ function labelVencimento(inv: Investimento): string {
   return "Indefinido";
 }
 
-type FormState = {
-  bancoId: string;
-  pessoaId: string;
-  tipo: TipoInvestimento;
-  produto: string;
-  valor: string;
-  modoLiquidez: "DIAS" | "DATA" | "NENHUM";
-  liquidezDias: string;
-  vencimento: string;
-  observacao: string;
-};
-
 function IconePlusCirculo() {
   return (
     <svg
-      className="h-5 w-5"
+      className="h-4 w-4"
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
@@ -165,20 +154,6 @@ function IconeChevron({ aberto }: { aberto: boolean }) {
   );
 }
 
-function formVazio(bancos: Banco[], pessoas: Pessoa[]): FormState {
-  return {
-    bancoId: bancos[0]?.id ?? "",
-    pessoaId: pessoas[0]?.id ?? "",
-    tipo: "RENDA_FIXA",
-    produto: "",
-    valor: "",
-    modoLiquidez: "DIAS",
-    liquidezDias: "0",
-    vencimento: "",
-    observacao: "",
-  };
-}
-
 export function InvestimentosClient() {
   const [bancos, setBancos] = useState<Banco[]>([]);
   const [pessoas, setPessoas] = useState<Pessoa[]>([]);
@@ -186,7 +161,8 @@ export function InvestimentosClient() {
     null,
   );
   const [liquidez, setLiquidez] = useState<FaixaLiquidez[] | null>(null);
-  const [form, setForm] = useState<FormState | null>(null);
+  const [mostrarNovoInvestimento, setMostrarNovoInvestimento] =
+    useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [naoAutenticado, setNaoAutenticado] = useState(false);
   const [reloadToken, setReloadToken] = useState(0);
@@ -232,7 +208,6 @@ export function InvestimentosClient() {
         setNaoAutenticado(false);
         setBancos(bcs);
         setPessoas(pes);
-        setForm((atual) => atual ?? formVazio(bcs, pes));
       })
       .catch(() => {
         if (!cancelado) setErro("Não foi possível carregar bancos/pessoas.");
@@ -284,31 +259,8 @@ export function InvestimentosClient() {
     };
   }, [anoPosicoes, reloadPosicoesToken]);
 
-  async function criarInvestimento(e: React.FormEvent) {
-    e.preventDefault();
-    if (!form) return;
-    setErro(null);
-
-    const response = await fetch("/api/investimentos", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        bancoId: form.bancoId,
-        pessoaId: form.pessoaId,
-        tipo: form.tipo,
-        produto: form.produto,
-        valorAtualCentavos: reaisParaCentavos(form.valor || "0"),
-        liquidezDias:
-          form.modoLiquidez === "DIAS" ? Number(form.liquidezDias) : null,
-        vencimento: form.modoLiquidez === "DATA" ? form.vencimento : null,
-        observacao: form.observacao.trim() === "" ? null : form.observacao,
-      }),
-    });
-    if (!response.ok) {
-      setErro(await parseErro(response));
-      return;
-    }
-    setForm(formVazio(bancos, pessoas));
+  function onInvestimentoCriado() {
+    setMostrarNovoInvestimento(false);
     setToast("Investimento adicionado com sucesso!");
     recarregar();
   }
@@ -423,12 +375,19 @@ export function InvestimentosClient() {
 
   const cardClass =
     "rounded-xl border border-outline-variant bg-surface-container-lowest shadow-sm";
-  const inputClass =
-    "rounded-lg border border-outline-variant bg-surface-container-lowest px-sm py-1.5 text-sm focus:border-primary focus:outline-none";
 
   return (
     <div className="gap-lg flex flex-col">
       {dialogConfirmacao}
+
+      {mostrarNovoInvestimento && (
+        <NovoInvestimentoModal
+          bancos={bancos}
+          pessoas={pessoas}
+          onClose={() => setMostrarNovoInvestimento(false)}
+          onCriado={onInvestimentoCriado}
+        />
+      )}
 
       {investimentoParaFinalizar && (
         <FinalizarInvestimentoModal
@@ -493,214 +452,6 @@ export function InvestimentosClient() {
         />
       )}
 
-      {aba === "CARTEIRA" && form && (
-        <div className={`${cardClass} p-lg`}>
-          <div className="mb-md border-outline-variant pb-md text-on-surface flex items-center gap-2 border-b">
-            <IconePlusCirculo />
-            <h2 className="text-base font-bold">Registrar Novo Investimento</h2>
-          </div>
-          <form
-            onSubmit={criarInvestimento}
-            className="gap-sm flex flex-wrap items-end"
-          >
-            <div className="flex flex-col gap-1">
-              <label
-                className="text-on-surface-variant text-xs font-semibold"
-                htmlFor="banco"
-              >
-                Banco
-              </label>
-              <select
-                id="banco"
-                className={inputClass}
-                value={form.bancoId}
-                onChange={(e) => setForm({ ...form, bancoId: e.target.value })}
-                required
-              >
-                {bancos.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.nome}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label
-                className="text-on-surface-variant text-xs font-semibold"
-                htmlFor="titular"
-              >
-                Titular
-              </label>
-              <select
-                id="titular"
-                className={inputClass}
-                value={form.pessoaId}
-                onChange={(e) => setForm({ ...form, pessoaId: e.target.value })}
-                required
-              >
-                {pessoas.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.nome}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label
-                className="text-on-surface-variant text-xs font-semibold"
-                htmlFor="tipo"
-              >
-                Tipo
-              </label>
-              <select
-                id="tipo"
-                className={inputClass}
-                value={form.tipo}
-                onChange={(e) =>
-                  setForm({
-                    ...form,
-                    tipo: e.target.value as TipoInvestimento,
-                  })
-                }
-              >
-                {TIPOS_INVESTIMENTO.map((t) => (
-                  <option key={t.value} value={t.value}>
-                    {t.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label
-                className="text-on-surface-variant text-xs font-semibold"
-                htmlFor="produto"
-              >
-                Produto
-              </label>
-              <input
-                id="produto"
-                className={inputClass}
-                value={form.produto}
-                onChange={(e) => setForm({ ...form, produto: e.target.value })}
-                required
-              />
-            </div>
-
-            <div className="flex flex-col gap-3">
-              <label
-                className="text-on-surface-variant text-xs font-semibold"
-                htmlFor="valor"
-              >
-                Valor atual (R$)
-              </label>
-              <input
-                id="valor"
-                type="number"
-                step="0.01"
-                placeholder="0,00"
-                className={`w-32 text-right ${inputClass}`}
-                value={form.valor}
-                onChange={(e) => setForm({ ...form, valor: e.target.value })}
-                required
-              />
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label
-                className="text-on-surface-variant text-xs font-semibold"
-                htmlFor="modo-liquidez"
-              >
-                Vencimento/liquidez
-              </label>
-              <select
-                id="modo-liquidez"
-                className={inputClass}
-                value={form.modoLiquidez}
-                onChange={(e) =>
-                  setForm({
-                    ...form,
-                    modoLiquidez: e.target.value as FormState["modoLiquidez"],
-                  })
-                }
-              >
-                <option value="DIAS">Prazo (D+n)</option>
-                <option value="DATA">Data de vencimento</option>
-                <option value="NENHUM">Indefinido</option>
-              </select>
-            </div>
-
-            {form.modoLiquidez === "DIAS" && (
-              <div className="flex flex-col gap-1">
-                <label
-                  className="text-on-surface-variant text-xs font-semibold"
-                  htmlFor="liquidez-dias"
-                >
-                  Dias (D+n)
-                </label>
-                <input
-                  id="liquidez-dias"
-                  type="number"
-                  min={0}
-                  className={`w-24 ${inputClass}`}
-                  value={form.liquidezDias}
-                  onChange={(e) =>
-                    setForm({ ...form, liquidezDias: e.target.value })
-                  }
-                />
-              </div>
-            )}
-
-            {form.modoLiquidez === "DATA" && (
-              <div className="flex flex-col gap-1">
-                <label
-                  className="text-on-surface-variant text-xs font-semibold"
-                  htmlFor="vencimento"
-                >
-                  Data
-                </label>
-                <input
-                  id="vencimento"
-                  type="date"
-                  className={inputClass}
-                  value={form.vencimento}
-                  onChange={(e) =>
-                    setForm({ ...form, vencimento: e.target.value })
-                  }
-                  required
-                />
-              </div>
-            )}
-
-            <div className="flex min-w-[180px] flex-1 flex-col gap-1">
-              <label
-                className="text-on-surface-variant text-xs font-semibold"
-                htmlFor="observacao"
-              >
-                Observação (Opcional)
-              </label>
-              <input
-                id="observacao"
-                className={inputClass}
-                value={form.observacao}
-                onChange={(e) =>
-                  setForm({ ...form, observacao: e.target.value })
-                }
-              />
-            </div>
-
-            <button
-              type="submit"
-              className="bg-primary px-md text-on-primary rounded-full py-2 text-xs font-semibold hover:opacity-90"
-            >
-              Adicionar
-            </button>
-          </form>
-        </div>
-      )}
-
       {aba === "CARTEIRA" && (
         <div className={cardClass}>
           <div className="gap-md p-lg pb-md flex flex-wrap items-center justify-between">
@@ -712,6 +463,14 @@ export function InvestimentosClient() {
                   ? "item cadastrado"
                   : "itens cadastrados"}
               </span>
+              <button
+                type="button"
+                onClick={() => setMostrarNovoInvestimento(true)}
+                className="bg-primary text-on-primary gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold hover:opacity-90 flex items-center"
+              >
+                <IconePlusCirculo />
+                Novo Investimento
+              </button>
             </div>
             <div className="gap-md flex items-center">
               {algumFiltroAtivo && (
