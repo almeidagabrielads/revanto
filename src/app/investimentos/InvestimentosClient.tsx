@@ -4,6 +4,7 @@ import { Fragment, useEffect, useMemo, useState } from "react";
 import { RelatorioInvestimentos } from "./RelatorioInvestimentos";
 import { PosicaoMensalInline } from "./PosicaoMensalInline";
 import { FinalizarInvestimentoModal } from "./FinalizarInvestimentoModal";
+import { EditarInvestimentoModal } from "./EditarInvestimentoModal";
 import { useConfirmDialog } from "../components/ConfirmDialog";
 import { ColumnHeader } from "../components/ColumnHeader";
 import { useTabela, type ColunaTabela } from "../components/useTabela";
@@ -129,6 +130,23 @@ function IconeFinalizar() {
   );
 }
 
+function IconeEditar() {
+  return (
+    <svg
+      className="h-4 w-4"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+      <path d="m15 5 4 4" />
+    </svg>
+  );
+}
+
 function IconeChevron({ aberto }: { aberto: boolean }) {
   return (
     <svg
@@ -174,6 +192,8 @@ export function InvestimentosClient() {
   const [toast, setToast] = useState<string | null>(null);
   const [mostrarFinalizados, setMostrarFinalizados] = useState(false);
   const [investimentoParaFinalizar, setInvestimentoParaFinalizar] =
+    useState<Investimento | null>(null);
+  const [investimentoParaEditar, setInvestimentoParaEditar] =
     useState<Investimento | null>(null);
   const { dialog: dialogConfirmacao } = useConfirmDialog();
 
@@ -297,6 +317,12 @@ export function InvestimentosClient() {
     recarregar();
   }
 
+  function onInvestimentoEditado() {
+    setInvestimentoParaEditar(null);
+    setToast("Investimento atualizado com sucesso!");
+    recarregar();
+  }
+
   const bancosPorId = useMemo(
     () => new Map(bancos.map((b) => [b.id, b])),
     [bancos],
@@ -379,6 +405,16 @@ export function InvestimentosClient() {
           bancos={bancos}
           onClose={() => setInvestimentoParaFinalizar(null)}
           onFinalizado={onInvestimentoFinalizado}
+        />
+      )}
+
+      {investimentoParaEditar && (
+        <EditarInvestimentoModal
+          investimento={investimentoParaEditar}
+          bancos={bancos}
+          pessoas={pessoas}
+          onClose={() => setInvestimentoParaEditar(null)}
+          onEditado={onInvestimentoEditado}
         />
       )}
 
@@ -799,7 +835,18 @@ export function InvestimentosClient() {
                           {formatarReais(inv.valorAtualCentavos)}
                         </td>
                         <td className="p-md">
-                          <div className="flex justify-end">
+                          <div className="flex justify-end gap-1">
+                            <button
+                              className="text-on-surface-variant hover:bg-surface-container-high rounded-full p-1.5 transition-colors"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setInvestimentoParaEditar(inv);
+                              }}
+                              title="Editar"
+                              aria-label="Editar"
+                            >
+                              <IconeEditar />
+                            </button>
                             {inv.status === "ATIVO" && (
                               <button
                                 className="text-primary hover:bg-primary-container rounded-full p-1.5 transition-colors"
