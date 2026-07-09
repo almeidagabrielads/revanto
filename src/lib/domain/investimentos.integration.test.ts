@@ -264,6 +264,36 @@ describe("finalizarInvestimento", () => {
     expect(resultado?.receita).toBeNull();
   });
 
+  it("usa a dataResgate informada como finalizadoEm e mês da receita", async () => {
+    const { household, isa, banco } = await montarBase();
+    const investimento = await criarInvestimento(prismaTest, household.id, {
+      bancoId: banco.id,
+      tipo: "RENDA_FIXA",
+      produto: "Teste",
+      valorAtualCentavos: 100000,
+      pessoaId: isa.id,
+    });
+
+    const resultado = await finalizarInvestimento(
+      prismaTest,
+      household.id,
+      investimento!.id,
+      {
+        valorResgatadoCentavos: 100000,
+        valorReinvestidoCentavos: 0,
+        criarReceita: true,
+        dataResgate: new Date("2026-05-10"),
+      },
+    );
+
+    expect(
+      resultado?.investimento.finalizadoEm?.toISOString().slice(0, 10),
+    ).toBe("2026-05-10");
+    expect(resultado?.receita?.mes.toISOString().slice(0, 10)).toBe(
+      "2026-05-01",
+    );
+  });
+
   it("lança erro ao tentar finalizar um investimento já finalizado", async () => {
     const { household, isa, banco } = await montarBase();
     const investimento = await criarInvestimento(prismaTest, household.id, {

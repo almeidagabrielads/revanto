@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ColumnHeader } from "../components/ColumnHeader";
 import { useTabela, type ColunaTabela } from "../components/useTabela";
+import { FAIXAS_LABEL } from "./InvestimentosClient";
 
 const TIPOS_INVESTIMENTO = [
   { value: "RENDA_FIXA", label: "Renda Fixa", cor: "var(--color-primary)" },
@@ -15,6 +16,64 @@ const TIPOS_INVESTIMENTO = [
   { value: "OUTRO", label: "Outro", cor: "var(--color-outline)" },
 ] as const;
 
+// Paleta categórica para agrupamentos dinâmicos (banco, titular) cujo número
+// de categorias não é fixo. O tom cinza (outline) fica reservado para o
+// bucket "Outros" — nunca geramos uma nova cor além destas.
+const PALETTE_CATEGORICA = [
+  "var(--color-primary)",
+  "var(--color-secondary)",
+  "var(--color-tertiary-container)",
+  "var(--color-on-tertiary-container)",
+];
+const COR_OUTROS = "var(--color-outline)";
+
+type GrupoAlocacao = {
+  chave: string;
+  label: string;
+  cor: string;
+  totalCentavos: number;
+  // Rótulos originais agregados nesta fatia — normalmente só o próprio
+  // label, mas o bucket "Outros" reúne vários (usado para filtrar a
+  // Carteira por todos eles ao clicar).
+  itens: string[];
+};
+
+function agruparComCores(
+  grupos: { chave: string; label: string; totalCentavos: number }[],
+): GrupoAlocacao[] {
+  const ordenados = [...grupos]
+    .filter((g) => g.totalCentavos > 0)
+    .sort((a, b) => b.totalCentavos - a.totalCentavos);
+
+  if (ordenados.length <= PALETTE_CATEGORICA.length) {
+    return ordenados.map((g, i) => ({
+      ...g,
+      cor: PALETTE_CATEGORICA[i],
+      itens: [g.label],
+    }));
+  }
+
+  const limite = PALETTE_CATEGORICA.length - 1;
+  const principais = ordenados.slice(0, limite).map((g, i) => ({
+    ...g,
+    cor: PALETTE_CATEGORICA[i],
+    itens: [g.label],
+  }));
+  const resto = ordenados.slice(limite);
+  const totalOutros = resto.reduce((soma, g) => soma + g.totalCentavos, 0);
+
+  return [
+    ...principais,
+    {
+      chave: "OUTROS",
+      label: "Outros",
+      totalCentavos: totalOutros,
+      cor: COR_OUTROS,
+      itens: resto.map((g) => g.label),
+    },
+  ];
+}
+
 type Banco = { id: string; nome: string };
 type Pessoa = { id: string; nome: string };
 type Investimento = {
@@ -25,6 +84,25 @@ type Investimento = {
   produto: string;
   valorAtualCentavos: number;
 };
+type FaixaLiquidez = { faixa: string; totalCentavos: number };
+
+// Prazos de liquidez têm uma ordem natural (mais perto → mais longe), por
+// isso usam uma rampa ordinal (um só matiz, claro→escuro) em vez da paleta
+// categórica. "Sem prazo definido" não é "o prazo mais longo", então fica
+// com o mesmo cinza neutro usado para o bucket "Outros".
+const ORDEM_LIQUIDEZ = [
+  "IMEDIATO",
+  "ATE_30_DIAS",
+  "ATE_90_DIAS",
+  "ATE_180_DIAS",
+  "ATE_365_DIAS",
+  "MAIS_DE_1_ANO",
+] as const;
+
+function corRampaLiquidez(indice: number): string {
+  const percentual = 20 + indice * 16;
+  return `color-mix(in srgb, var(--color-primary) ${percentual}%, white)`;
+}
 type LinhaRendimento = {
   mes: string;
   rendimentoAcumuladoRealPercentual: number;
@@ -49,7 +127,16 @@ function labelTipo(tipo: string): string {
   return TIPOS_INVESTIMENTO.find((t) => t.value === tipo)?.label ?? tipo;
 }
 
-function Donut({ fatias }: { fatias: { cor: string; valor: number }[] }) {
+function Donut({
+  fatias,
+}: {
+  fatias: {
+    cor: string;
+    valor: number;
+    titulo?: string;
+    onClick?: () => void;
+  }[];
+}) {
   const total = fatias.reduce((soma, f) => soma + f.valor, 0);
   const raio = 60;
   const circunferencia = 2 * Math.PI * raio;
@@ -84,10 +171,79 @@ function Donut({ fatias }: { fatias: { cor: string; valor: number }[] }) {
                 strokeWidth={20}
                 strokeDasharray={`${comprimento} ${circunferencia - comprimento}`}
                 strokeDashoffset={offset}
-              />
+                onClick={f.onClick}
+                className={f.onClick ? "cursor-pointer" : undefined}
+              >
+                {f.titulo && <title>{f.titulo}</title>}
+              </circle>
             );
           })}
     </svg>
+  );
+}
+
+function AlocacaoCard({
+  titulo,
+  grupos,
+  onSelecionar,
+}: {
+  titulo: string;
+  grupos: GrupoAlocacao[];
+  onSelecionar?: (grupo: GrupoAlocacao) => void;
+}) {
+  return (
+    <section className="gap-md border-outline-variant bg-surface-container-lowest p-lg flex flex-col rounded-xl border shadow-sm">
+      <h2 className="text-on-surface text-base font-bold">{titulo}</h2>
+      {grupos.length > 0 ? (
+        <>
+          <div className="flex justify-center">
+            <Donut
+              fatias={grupos.map((g) => ({
+                cor: g.cor,
+                valor: g.totalCentavos,
+                titulo: `${g.label}: ${formatarReais(g.totalCentavos)}`,
+                onClick: onSelecionar ? () => onSelecionar(g) : undefined,
+              }))}
+            />
+          </div>
+          <ul className="flex flex-col gap-2">
+            {grupos.map((g) => (
+              <li key={g.chave} className="flex items-center gap-2 text-sm">
+                {onSelecionar ? (
+                  <button
+                    type="button"
+                    onClick={() => onSelecionar(g)}
+                    title={`Ver na Carteira: ${g.label}`}
+                    className="flex flex-1 cursor-pointer items-center gap-2 rounded-lg text-left hover:underline"
+                  >
+                    <span
+                      className="h-2.5 w-2.5 shrink-0 rounded-full"
+                      style={{ backgroundColor: g.cor }}
+                    />
+                    <span className="text-on-surface-variant">{g.label}</span>
+                  </button>
+                ) : (
+                  <>
+                    <span
+                      className="h-2.5 w-2.5 rounded-full"
+                      style={{ backgroundColor: g.cor }}
+                    />
+                    <span className="text-on-surface-variant">{g.label}</span>
+                  </>
+                )}
+                <span className="data-tabular text-on-surface ml-auto font-medium">
+                  {formatarReais(g.totalCentavos)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : (
+        <p className="text-on-surface-variant text-sm">
+          Nenhum investimento cadastrado.
+        </p>
+      )}
+    </section>
   );
 }
 
@@ -150,10 +306,17 @@ export function RelatorioInvestimentos({
   investimentos,
   bancos,
   pessoas,
+  liquidez,
+  onFiltrarCarteira,
 }: {
   investimentos: Investimento[];
   bancos: Banco[];
   pessoas: Pessoa[];
+  liquidez: FaixaLiquidez[];
+  onFiltrarCarteira?: (
+    chave: "tipo" | "banco" | "titular" | "faixaLiquidez",
+    valores: string[],
+  ) => void;
 }) {
   const anoAtual = new Date().getUTCFullYear();
   const [ano, setAno] = useState(anoAtual);
@@ -203,9 +366,89 @@ export function RelatorioInvestimentos({
     [pessoas],
   );
 
+  const gruposClasse = useMemo<GrupoAlocacao[]>(
+    () =>
+      grupos.map((g) => ({
+        chave: g.value,
+        label: g.label,
+        cor: g.cor,
+        totalCentavos: g.totalCentavos,
+        itens: [g.label],
+      })),
+    [grupos],
+  );
+
+  const gruposBanco = useMemo(() => {
+    const totais = new Map<string, number>();
+    for (const inv of investimentos) {
+      totais.set(
+        inv.bancoId,
+        (totais.get(inv.bancoId) ?? 0) + inv.valorAtualCentavos,
+      );
+    }
+    return agruparComCores(
+      [...totais.entries()].map(([bancoId, totalCentavos]) => ({
+        chave: bancoId,
+        label: bancosPorId.get(bancoId)?.nome ?? "—",
+        totalCentavos,
+      })),
+    );
+  }, [investimentos, bancosPorId]);
+
+  const gruposTitular = useMemo(() => {
+    const totais = new Map<string, number>();
+    for (const inv of investimentos) {
+      totais.set(
+        inv.pessoaId,
+        (totais.get(inv.pessoaId) ?? 0) + inv.valorAtualCentavos,
+      );
+    }
+    return agruparComCores(
+      [...totais.entries()].map(([pessoaId, totalCentavos]) => ({
+        chave: pessoaId,
+        label: pessoasPorId.get(pessoaId)?.nome ?? "—",
+        totalCentavos,
+      })),
+    );
+  }, [investimentos, pessoasPorId]);
+
+  const gruposLiquidez = useMemo<GrupoAlocacao[]>(() => {
+    const porFaixa = new Map(liquidez.map((l) => [l.faixa, l.totalCentavos]));
+
+    const definidos = ORDEM_LIQUIDEZ.map((faixa, i) => {
+      const label = FAIXAS_LABEL[faixa] ?? faixa;
+      return {
+        chave: faixa,
+        label,
+        cor: corRampaLiquidez(i),
+        totalCentavos: porFaixa.get(faixa) ?? 0,
+        itens: [label],
+      };
+    }).filter((g) => g.totalCentavos > 0);
+
+    const totalIndefinido = porFaixa.get("INDEFINIDO") ?? 0;
+    if (totalIndefinido <= 0) return definidos;
+
+    const labelIndefinido = FAIXAS_LABEL.INDEFINIDO;
+    return [
+      ...definidos,
+      {
+        chave: "INDEFINIDO",
+        label: labelIndefinido,
+        cor: COR_OUTROS,
+        totalCentavos: totalIndefinido,
+        itens: [labelIndefinido],
+      },
+    ];
+  }, [liquidez]);
+
   const colunasInvestimentos = useMemo<ColunaTabela<Investimento>[]>(
     () => [
-      { chave: "classe", tipo: "opcoes", acessor: (inv) => labelTipo(inv.tipo) },
+      {
+        chave: "classe",
+        tipo: "opcoes",
+        acessor: (inv) => labelTipo(inv.tipo),
+      },
       {
         chave: "instituicao",
         tipo: "opcoes",
@@ -289,42 +532,46 @@ export function RelatorioInvestimentos({
         </span>
       </div>
 
+      <div className="gap-lg grid grid-cols-1 md:grid-cols-3">
+        <AlocacaoCard
+          titulo="Alocação por Classe"
+          grupos={gruposClasse}
+          onSelecionar={
+            onFiltrarCarteira
+              ? (g) => onFiltrarCarteira("tipo", g.itens)
+              : undefined
+          }
+        />
+        <AlocacaoCard
+          titulo="Alocação por Banco"
+          grupos={gruposBanco}
+          onSelecionar={
+            onFiltrarCarteira
+              ? (g) => onFiltrarCarteira("banco", g.itens)
+              : undefined
+          }
+        />
+        <AlocacaoCard
+          titulo="Alocação por Titular"
+          grupos={gruposTitular}
+          onSelecionar={
+            onFiltrarCarteira
+              ? (g) => onFiltrarCarteira("titular", g.itens)
+              : undefined
+          }
+        />
+      </div>
+
       <div className="gap-lg grid grid-cols-1 lg:grid-cols-[minmax(0,340px)_1fr]">
-        <section className="gap-md border-outline-variant bg-surface-container-lowest p-lg flex flex-col rounded-xl border shadow-sm">
-          <h2 className="text-on-surface text-base font-bold">
-            Alocação de Ativos
-          </h2>
-          {grupos.length > 0 ? (
-            <>
-              <div className="flex justify-center">
-                <Donut
-                  fatias={grupos.map((g) => ({
-                    cor: g.cor,
-                    valor: g.totalCentavos,
-                  }))}
-                />
-              </div>
-              <ul className="flex flex-col gap-2">
-                {grupos.map((g) => (
-                  <li key={g.value} className="flex items-center gap-2 text-sm">
-                    <span
-                      className="h-2.5 w-2.5 rounded-full"
-                      style={{ backgroundColor: g.cor }}
-                    />
-                    <span className="text-on-surface-variant">{g.label}</span>
-                    <span className="data-tabular text-on-surface ml-auto font-medium">
-                      {formatarReais(g.totalCentavos)}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </>
-          ) : (
-            <p className="text-on-surface-variant text-sm">
-              Nenhum investimento cadastrado.
-            </p>
-          )}
-        </section>
+        <AlocacaoCard
+          titulo="Liquidez de Resgate"
+          grupos={gruposLiquidez}
+          onSelecionar={
+            onFiltrarCarteira
+              ? (g) => onFiltrarCarteira("faixaLiquidez", g.itens)
+              : undefined
+          }
+        />
 
         <section className="gap-md border-outline-variant bg-surface-container-lowest p-lg flex flex-col rounded-xl border shadow-sm">
           <div className="flex items-center justify-between">

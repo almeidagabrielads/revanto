@@ -20,6 +20,7 @@ export async function GET(request: NextRequest) {
 
   const resultado = await buscarRelatorioAnual(prisma, session.householdId, {
     ano,
+    pessoaId: params.get("pessoaId") ?? undefined,
   });
   return NextResponse.json(resultado);
 }

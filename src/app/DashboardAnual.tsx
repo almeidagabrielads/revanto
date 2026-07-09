@@ -98,6 +98,21 @@ function formatarReaisCompacto(centavos: number): string {
   return (centavos / 100).toLocaleString("pt-BR", { maximumFractionDigits: 0 });
 }
 
+function formatarReaisCompactoComSimbolo(centavos: number): string {
+  return `R$ ${formatarReaisCompacto(centavos)}`;
+}
+
+function mediaMensesConcluidos(
+  valoresPorMes: number[],
+  mesesConcluidos: number,
+): string {
+  if (mesesConcluidos === 0) return "—";
+  const soma = valoresPorMes
+    .slice(0, mesesConcluidos)
+    .reduce((total, valor) => total + valor, 0);
+  return formatarReaisCompactoComSimbolo(soma / mesesConcluidos);
+}
+
 function reaisParaCentavos(valor: string): number {
   const n = Number(valor.replace(",", "."));
   return Math.round(n * 100);
@@ -123,26 +138,49 @@ function somarItens(secoes: SecaoPlanejadoVsReal[]) {
     }
   >();
 
+  function entrada(item: PlanejadoVsRealCategoria) {
+    const k = chave(item.categoriaId, item.subcategoriaId);
+    const atual = consolidado.get(k) ?? {
+      categoriaId: item.categoriaId,
+      subcategoriaId: item.subcategoriaId,
+      meses: Array.from({ length: 12 }, () => ({
+        planejadoCentavos: 0,
+        realCentavos: 0,
+      })),
+      planejadoAnoCentavos: 0,
+      realAnoCentavos: 0,
+    };
+    consolidado.set(k, atual);
+    return atual;
+  }
+
+  // Planejado: cada seção tem orçamentos de um dono diferente (pessoa
+  // individual ou compartilhado), então somar todas é correto.
   for (const secao of secoes) {
     for (const item of secao.itens) {
-      const k = chave(item.categoriaId, item.subcategoriaId);
-      const atual = consolidado.get(k) ?? {
-        categoriaId: item.categoriaId,
-        subcategoriaId: item.subcategoriaId,
-        meses: Array.from({ length: 12 }, () => ({
-          planejadoCentavos: 0,
-          realCentavos: 0,
-        })),
-        planejadoAnoCentavos: 0,
-        realAnoCentavos: 0,
-      };
+      const atual = entrada(item);
       for (const mes of item.meses) {
         atual.meses[mes.mes - 1].planejadoCentavos += mes.planejadoCentavos;
-        atual.meses[mes.mes - 1].realCentavos += mes.realCentavos;
       }
       atual.planejadoAnoCentavos += item.acumulado.planejadoCentavos;
+    }
+  }
+
+  // Real: a seção "Compartilhado" (pessoaId nulo) já reflete o total do
+  // household sem filtro (ver buscarPlanejadoVsReal), não só os gastos
+  // compartilhados — somar o real das seções individuais por cima duplicaria
+  // o valor (cada pessoa já inclui sua fração dos gastos de grupo). Quando
+  // não há seção "Compartilhado" (visão filtrada por uma única pessoa/
+  // grupo), essa seção única já é a fonte de verdade.
+  const secaoCompartilhada = secoes.find((s) => s.pessoaId === null);
+  const secoesReal = secaoCompartilhada ? [secaoCompartilhada] : secoes;
+  for (const secao of secoesReal) {
+    for (const item of secao.itens) {
+      const atual = entrada(item);
+      for (const mes of item.meses) {
+        atual.meses[mes.mes - 1].realCentavos += mes.realCentavos;
+      }
       atual.realAnoCentavos += item.acumulado.realCentavos;
-      consolidado.set(k, atual);
     }
   }
 
@@ -163,6 +201,7 @@ export function DashboardAnual({ ano }: { ano: number }) {
   const [salvandoSaldoAnterior, setSalvandoSaldoAnterior] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [naoAutenticado, setNaoAutenticado] = useState(false);
+  const [pessoaFiltro, setPessoaFiltro] = useState("");
 
   useEffect(() => {
     let cancelado = false;
@@ -197,9 +236,10 @@ export function DashboardAnual({ ano }: { ano: number }) {
 
   useEffect(() => {
     let cancelado = false;
+    const pessoaQuery = pessoaFiltro ? `&pessoaId=${pessoaFiltro}` : "";
     Promise.all([
-      fetch(`/api/relatorios/anual?ano=${ano}`),
-      fetch(`/api/relatorios/saldo?ano=${ano - 1}`),
+      fetch(`/api/relatorios/anual?ano=${ano}${pessoaQuery}`),
+      fetch(`/api/relatorios/saldo?ano=${ano - 1}${pessoaQuery}`),
       fetch(`/api/relatorios/saldo-anterior?ano=${ano}`),
     ])
       .then(async ([relatorioRes, saldoAnteriorRes, saldoAnoAnteriorRes]) => {
@@ -238,7 +278,7 @@ export function DashboardAnual({ ano }: { ano: number }) {
     return () => {
       cancelado = true;
     };
-  }, [ano, reloadToken]);
+  }, [ano, reloadToken, pessoaFiltro]);
 
   async function salvarSaldoAnoAnterior(e: React.FormEvent) {
     e.preventDefault();
@@ -343,11 +383,15 @@ export function DashboardAnual({ ano }: { ano: number }) {
     ...saldo.porMes.flatMap((m) => [m.receitaCentavos, m.despesaCentavos]),
   );
 
+  // "Compartilhado" (pessoaId nulo) não é um responsável — é o total do
+  // household sem filtro (ver buscarPlanejadoVsReal). Somando só as pessoas
+  // individuais já se chega a 100% do gasto real (cada uma inclui sua fração
+  // dos gastos de grupo), sem contar nada em dobro.
   const secoesComItens = relatorio.planejadoVsReal.filter(
-    (s) => s.itens.length > 0,
+    (s) => s.pessoaId !== null && s.itens.length > 0,
   );
   const totalPorSecao = secoesComItens.map((s) => ({
-    label: s.pessoaId ? nomePessoa.get(s.pessoaId) : "Compartilhado",
+    label: nomePessoa.get(s.pessoaId!),
     totalCentavos: s.itens.reduce(
       (soma, i) => soma + i.acumulado.realCentavos,
       0,
@@ -383,6 +427,14 @@ export function DashboardAnual({ ano }: { ano: number }) {
     ),
   );
 
+  const agora = new Date();
+  const mesesConcluidos =
+    ano < agora.getFullYear()
+      ? 12
+      : ano === agora.getFullYear()
+        ? agora.getMonth()
+        : 0;
+
   const mesMaisCaro = totalConsolidadoPorMes.reduce(
     (maiorIdx, valor, idx) =>
       valor > totalConsolidadoPorMes[maiorIdx] ? idx : maiorIdx,
@@ -409,7 +461,28 @@ export function DashboardAnual({ ano }: { ano: number }) {
         </p>
       )}
 
-      <div className="flex justify-end">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <label
+            htmlFor="pessoaFiltro"
+            className="text-on-surface-variant text-xs font-semibold tracking-wide uppercase"
+          >
+            Visualizando
+          </label>
+          <select
+            id="pessoaFiltro"
+            value={pessoaFiltro}
+            onChange={(e) => setPessoaFiltro(e.target.value)}
+            className="border-outline-variant bg-surface-container-lowest text-on-surface px-md rounded-full border py-1.5 text-sm font-semibold"
+          >
+            <option value="">Geral</option>
+            {pessoas.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.nome}
+              </option>
+            ))}
+          </select>
+        </div>
         <Link
           href="/configuracoes/exportar-dados"
           className="bg-primary px-md py-sm text-on-primary rounded-xl text-sm font-semibold hover:opacity-90"
@@ -516,9 +589,7 @@ export function DashboardAnual({ ano }: { ano: number }) {
               </span>
             </div>
             <div className="flex flex-col gap-1 text-right">
-              <p className="text-on-surface-variant text-sm">
-                Saldo acumulado
-              </p>
+              <p className="text-on-surface-variant text-sm">Saldo acumulado</p>
               <p
                 className={`data-tabular text-xl font-bold ${
                   saldoAcumulado >= 0 ? "text-success" : "text-danger"
@@ -531,12 +602,12 @@ export function DashboardAnual({ ano }: { ano: number }) {
         ) : (
           <form
             onSubmit={salvarSaldoAnoAnterior}
-            className="flex flex-wrap items-end gap-sm"
+            className="gap-sm flex flex-wrap items-end"
           >
             {!saldoAnoAnterior && (
               <p className="text-on-surface-variant w-full text-sm">
-                Nenhum lançamento encontrado para {ano - 1}. Informe o saldo
-                de fechamento desse ano para acumular com o saldo de {ano}.
+                Nenhum lançamento encontrado para {ano - 1}. Informe o saldo de
+                fechamento desse ano para acumular com o saldo de {ano}.
               </p>
             )}
             <div className="flex flex-col gap-1">
@@ -550,7 +621,7 @@ export function DashboardAnual({ ano }: { ano: number }) {
                 id="saldo-ano-anterior"
                 type="number"
                 step="0.01"
-                className="border-outline-variant bg-surface-container-lowest w-40 rounded-lg border px-sm py-1.5 text-sm"
+                className="border-outline-variant bg-surface-container-lowest px-sm w-40 rounded-lg border py-1.5 text-sm"
                 value={inputSaldoAnterior}
                 onChange={(e) => setInputSaldoAnterior(e.target.value)}
                 required
@@ -583,33 +654,49 @@ export function DashboardAnual({ ano }: { ano: number }) {
           <h2 className="text-on-surface text-base font-semibold">
             Fluxo de caixa mensal
           </h2>
-          <div className="flex h-40 items-end gap-2">
-            {saldo.porMes.map((m) => (
-              <div
-                key={m.mes}
-                className="flex flex-1 flex-col items-center gap-1"
-              >
-                <div className="flex h-32 w-full items-end justify-center gap-0.5">
-                  <div
-                    className="bg-primary w-1/2 rounded-t"
-                    style={{
-                      height: `${(m.receitaCentavos / maxFluxoMensal) * 100}%`,
-                    }}
-                    title={`Receita: ${formatarReais(m.receitaCentavos)}`}
-                  />
-                  <div
-                    className="bg-outline-variant w-1/2 rounded-t"
-                    style={{
-                      height: `${(m.despesaCentavos / maxFluxoMensal) * 100}%`,
-                    }}
-                    title={`Despesa: ${formatarReais(m.despesaCentavos)}`}
-                  />
+          <div className="flex h-48 items-end gap-2">
+            {saldo.porMes.map((m) => {
+              const pctReceita = (m.receitaCentavos / maxFluxoMensal) * 100;
+              const pctDespesa = (m.despesaCentavos / maxFluxoMensal) * 100;
+              return (
+                <div
+                  key={m.mes}
+                  className="flex flex-1 flex-col items-center gap-1"
+                >
+                  <div className="flex h-32 w-full items-end justify-center gap-0.5">
+                    <div className="relative flex h-full w-1/2 items-end">
+                      <span
+                        className="data-tabular text-on-surface-variant absolute left-1/2 -translate-x-1/2 text-[9px] font-semibold whitespace-nowrap"
+                        style={{ bottom: `calc(${pctReceita}% + 2px)` }}
+                      >
+                        {formatarReaisCompacto(m.receitaCentavos)}
+                      </span>
+                      <div
+                        className="bg-primary w-full rounded-t"
+                        style={{ height: `${pctReceita}%` }}
+                        title={`Receita: ${formatarReais(m.receitaCentavos)}`}
+                      />
+                    </div>
+                    <div className="relative flex h-full w-1/2 items-end">
+                      <span
+                        className="data-tabular text-on-surface-variant absolute left-1/2 -translate-x-1/2 text-[9px] font-semibold whitespace-nowrap"
+                        style={{ bottom: `calc(${pctDespesa}% + 2px)` }}
+                      >
+                        {formatarReaisCompacto(m.despesaCentavos)}
+                      </span>
+                      <div
+                        className="bg-outline-variant w-full rounded-t"
+                        style={{ height: `${pctDespesa}%` }}
+                        title={`Despesa: ${formatarReais(m.despesaCentavos)}`}
+                      />
+                    </div>
+                  </div>
+                  <span className="text-on-surface-variant text-[10px] font-medium">
+                    {MESES[m.mes - 1].toUpperCase()}
+                  </span>
                 </div>
-                <span className="text-on-surface-variant text-[10px] font-medium">
-                  {MESES[m.mes - 1].toUpperCase()}
-                </span>
-              </div>
-            ))}
+              );
+            })}
           </div>
           <div className="gap-md text-on-surface-variant flex items-center text-xs">
             <span className="flex items-center gap-1">
@@ -735,47 +822,76 @@ export function DashboardAnual({ ano }: { ano: number }) {
                     {m}
                   </th>
                 ))}
+                <th className="border-outline-variant border-l p-2 text-right">
+                  Média
+                </th>
               </tr>
             </thead>
             <tbody>
-              {categoriasComItens.map(({ categoria, itens }) => (
-                <Fragment key={categoria.id}>
-                  <tr className="bg-surface-container-low">
-                    <td
-                      className="text-on-surface p-2 font-semibold"
-                      colSpan={13}
-                    >
-                      {categoria.nome}
-                    </td>
-                  </tr>
-                  {itens.map((item) => (
-                    <tr
-                      key={chave(item.categoriaId, item.subcategoriaId)}
-                      className="border-outline-variant/60 border-b"
-                    >
-                      <td className="pl-lg text-on-surface-variant p-2">
-                        {item.subcategoriaId
-                          ? (nomeSubcategoria.get(item.subcategoriaId) ??
-                            item.subcategoriaId)
-                          : "Geral"}
+              {categoriasComItens.map(({ categoria, itens }) => {
+                const subtotalPorMes = Array.from({ length: 12 }, (_, i) =>
+                  itens.reduce(
+                    (soma, item) => soma + item.meses[i].realCentavos,
+                    0,
+                  ),
+                );
+                return (
+                  <Fragment key={categoria.id}>
+                    <tr className="bg-surface-container-low">
+                      <td className="text-on-surface p-2 font-semibold">
+                        {categoria.nome}
                       </td>
-                      {item.meses.map((mes, idx) => (
+                      {subtotalPorMes.map((total, idx) => (
                         <td
                           key={idx}
-                          className={`data-tabular p-2 text-right ${
-                            mes.planejadoCentavos > 0 &&
-                            mes.realCentavos > mes.planejadoCentavos
-                              ? "text-danger font-semibold"
-                              : "text-on-surface"
-                          }`}
+                          className="data-tabular text-on-surface p-2 text-right font-semibold"
                         >
-                          {formatarReaisCompacto(mes.realCentavos)}
+                          {formatarReaisCompactoComSimbolo(total)}
                         </td>
                       ))}
+                      <td className="data-tabular text-on-surface border-outline-variant border-l p-2 text-right font-semibold">
+                        {mediaMensesConcluidos(subtotalPorMes, mesesConcluidos)}
+                      </td>
                     </tr>
-                  ))}
-                </Fragment>
-              ))}
+                    {itens.map((item) => {
+                      const realPorMes = item.meses.map(
+                        (mes) => mes.realCentavos,
+                      );
+                      return (
+                        <tr
+                          key={chave(item.categoriaId, item.subcategoriaId)}
+                          className="border-outline-variant/60 border-b"
+                        >
+                          <td className="pl-lg text-on-surface-variant p-2">
+                            {item.subcategoriaId
+                              ? (nomeSubcategoria.get(item.subcategoriaId) ??
+                                item.subcategoriaId)
+                              : "Geral"}
+                          </td>
+                          {item.meses.map((mes, idx) => (
+                            <td
+                              key={idx}
+                              className={`data-tabular p-2 text-right ${
+                                mes.planejadoCentavos > 0 &&
+                                mes.realCentavos > mes.planejadoCentavos
+                                  ? "text-danger font-semibold"
+                                  : "text-on-surface"
+                              }`}
+                            >
+                              {formatarReaisCompactoComSimbolo(
+                                mes.realCentavos,
+                              )}
+                            </td>
+                          ))}
+                          <td className="data-tabular text-on-surface-variant border-outline-variant border-l p-2 text-right">
+                            {mediaMensesConcluidos(realPorMes, mesesConcluidos)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </Fragment>
+                );
+              })}
               <tr className="border-outline-variant border-t-2 font-semibold">
                 <td className="text-on-surface p-2">Total consolidado</td>
                 {totalConsolidadoPorMes.map((total, idx) => (
@@ -783,9 +899,15 @@ export function DashboardAnual({ ano }: { ano: number }) {
                     key={idx}
                     className="data-tabular text-on-surface p-2 text-right"
                   >
-                    {formatarReaisCompacto(total)}
+                    {formatarReaisCompactoComSimbolo(total)}
                   </td>
                 ))}
+                <td className="data-tabular text-on-surface border-outline-variant border-l p-2 text-right">
+                  {mediaMensesConcluidos(
+                    totalConsolidadoPorMes,
+                    mesesConcluidos,
+                  )}
+                </td>
               </tr>
             </tbody>
           </table>

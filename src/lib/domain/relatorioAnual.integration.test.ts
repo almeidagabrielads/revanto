@@ -201,6 +201,109 @@ describe("buscarRelatorioAnual", () => {
     ]);
   });
 
+  it("filtra por pessoa individual, ratando a fração dela nos gastos do grupo", async () => {
+    const { household, isa, categoria, subcategoria, banco } =
+      await montarBase();
+
+    await criarOrcamento(prismaTest, household.id, {
+      pessoaId: isa.id,
+      categoriaId: categoria.id,
+      subcategoriaId: subcategoria.id,
+      mes: 1,
+      ano: 2026,
+      valorCentavos: 50_000,
+    });
+
+    const casal = await prismaTest.pessoa.findFirstOrThrow({
+      where: { householdId: household.id, tipo: "CASAL" },
+    });
+
+    await criarLancamento(prismaTest, household.id, {
+      data: new Date(Date.UTC(2026, 0, 5)),
+      categoriaId: categoria.id,
+      subcategoriaId: subcategoria.id,
+      bancoId: banco.id,
+      pessoaDivisaoId: casal.id,
+      pessoaPagouId: isa.id,
+      valorCentavos: 200_000,
+    });
+    await criarLancamento(prismaTest, household.id, {
+      data: new Date(Date.UTC(2026, 0, 10)),
+      categoriaId: categoria.id,
+      subcategoriaId: subcategoria.id,
+      bancoId: banco.id,
+      pessoaDivisaoId: isa.id,
+      pessoaPagouId: isa.id,
+      valorCentavos: 40_000,
+    });
+
+    const relatorio = await buscarRelatorioAnual(prismaTest, household.id, {
+      ano: 2026,
+      pessoaId: isa.id,
+    });
+
+    // 50% de 200_000 (fração da Isa no casal, peso igual) + 40_000 direto = 140_000.
+    expect(relatorio.saldo.despesaCentavos).toBe(140_000);
+    expect(relatorio.resumoPorCategoria).toEqual([
+      expect.objectContaining({
+        categoriaId: categoria.id,
+        totalCentavos: 140_000,
+      }),
+    ]);
+    expect(relatorio.planejadoVsReal).toHaveLength(1);
+    expect(relatorio.planejadoVsReal[0]).toMatchObject({
+      pessoaId: isa.id,
+      label: "Isa",
+    });
+    expect(relatorio.planejadoVsReal[0].itens[0].meses[0]).toMatchObject({
+      planejadoCentavos: 50_000,
+      realCentavos: 140_000,
+    });
+  });
+
+  it("filtra por grupo (CASAL/FAMILIA) trazendo o valor cheio, sem fração", async () => {
+    const { household, isa, categoria, subcategoria, banco } =
+      await montarBase();
+    const casal = await prismaTest.pessoa.findFirstOrThrow({
+      where: { householdId: household.id, tipo: "CASAL" },
+    });
+
+    await criarLancamento(prismaTest, household.id, {
+      data: new Date(Date.UTC(2026, 0, 5)),
+      categoriaId: categoria.id,
+      subcategoriaId: subcategoria.id,
+      bancoId: banco.id,
+      pessoaDivisaoId: casal.id,
+      pessoaPagouId: isa.id,
+      valorCentavos: 200_000,
+    });
+    await criarLancamento(prismaTest, household.id, {
+      data: new Date(Date.UTC(2026, 0, 10)),
+      categoriaId: categoria.id,
+      subcategoriaId: subcategoria.id,
+      bancoId: banco.id,
+      pessoaDivisaoId: isa.id,
+      pessoaPagouId: isa.id,
+      valorCentavos: 40_000,
+    });
+
+    const relatorio = await buscarRelatorioAnual(prismaTest, household.id, {
+      ano: 2026,
+      pessoaId: casal.id,
+    });
+
+    // Só o gasto do próprio grupo, valor cheio (sem os 40_000 individuais da Isa).
+    expect(relatorio.saldo.despesaCentavos).toBe(200_000);
+    expect(relatorio.planejadoVsReal).toHaveLength(1);
+    expect(relatorio.planejadoVsReal[0]).toMatchObject({
+      pessoaId: casal.id,
+      label: "Casal",
+    });
+    expect(relatorio.planejadoVsReal[0].itens[0].meses[0]).toMatchObject({
+      realCentavos: 200_000,
+    });
+  });
+
   it("omite a divisão de despesas quando o household não tem duas pessoas individuais", async () => {
     const household = await prismaTest.household.create({
       data: { nome: "Sem casal" },

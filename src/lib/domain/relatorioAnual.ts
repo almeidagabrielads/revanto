@@ -87,12 +87,31 @@ export async function buscarEvolucaoPatrimonioTotal(
   return calcularEvolucaoPatrimonio(posicoes);
 }
 
-export async function buscarRelatorioAnual(
+// Sem pessoaId (visão "Geral"): uma seção por pessoa individual + uma
+// "Compartilhado" (orçamento da casa, pessoaId nulo) — como antes.
+// Com pessoaId (pessoa individual ou grupo CASAL/FAMILIA): uma única seção
+// com a visão daquele responsável, já com a mesma fração de gastos de grupo
+// usada em buscarSaldo/buscarResumoPorCategoria (ver resolverFracaoPorGrupo
+// em pessoas.ts) — filtrar por uma pessoa individual soma só a parte dela
+// dos gastos do grupo; filtrar por um grupo traz o valor cheio dele.
+async function buscarSecoesPlanejadoVsReal(
   prisma: PrismaClient,
   householdId: string,
-  opts: { ano: number },
-): Promise<RelatorioAnual> {
-  const { ano } = opts;
+  opts: { ano: number; pessoaId: string | null },
+): Promise<SecaoPlanejadoVsReal[]> {
+  if (opts.pessoaId) {
+    const [pessoa, itens] = await Promise.all([
+      prisma.pessoa.findFirst({
+        where: { id: opts.pessoaId, householdId },
+        select: { nome: true },
+      }),
+      buscarPlanejadoVsReal(prisma, householdId, {
+        ano: opts.ano,
+        pessoaId: opts.pessoaId,
+      }),
+    ]);
+    return [{ pessoaId: opts.pessoaId, label: pessoa?.nome ?? "—", itens }];
+  }
 
   const pessoasIndividuais = await prisma.pessoa.findMany({
     where: { householdId, tipo: "INDIVIDUAL" },
@@ -100,35 +119,22 @@ export async function buscarRelatorioAnual(
     select: { id: true, nome: true },
   });
 
-  const [
-    saldo,
-    planejadoVsRealFamilia,
-    planejadoVsRealPorPessoa,
-    resumoPorCategoria,
-    resumoPorSubcategoria,
-    evolucaoPatrimonio,
-    divisaoDespesas,
-  ] = await Promise.all([
-    buscarSaldo(prisma, householdId, { ano }),
-    buscarPlanejadoVsReal(prisma, householdId, { ano, pessoaId: null }),
+  const [planejadoVsRealFamilia, planejadoVsRealPorPessoa] = await Promise.all([
+    buscarPlanejadoVsReal(prisma, householdId, {
+      ano: opts.ano,
+      pessoaId: null,
+    }),
     Promise.all(
       pessoasIndividuais.map((pessoa) =>
         buscarPlanejadoVsReal(prisma, householdId, {
-          ano,
+          ano: opts.ano,
           pessoaId: pessoa.id,
         }),
       ),
     ),
-    buscarResumoPorCategoria(prisma, householdId, { ano }),
-    buscarResumoPorSubcategoria(prisma, householdId, { ano }),
-    buscarEvolucaoPatrimonioTotal(prisma, householdId, ano),
-    buscarSaldoDivisaoGrupo(prisma, householdId, {
-      dataInicio: new Date(Date.UTC(ano, 0, 1)),
-      dataFim: new Date(Date.UTC(ano, 11, 31)),
-    }),
   ]);
 
-  const planejadoVsReal: SecaoPlanejadoVsReal[] = [
+  return [
     ...pessoasIndividuais.map((pessoa, i) => ({
       pessoaId: pessoa.id,
       label: pessoa.nome,
@@ -140,6 +146,40 @@ export async function buscarRelatorioAnual(
       itens: planejadoVsRealFamilia,
     },
   ];
+}
+
+export async function buscarRelatorioAnual(
+  prisma: PrismaClient,
+  householdId: string,
+  opts: { ano: number; pessoaId?: string | null },
+): Promise<RelatorioAnual> {
+  const { ano } = opts;
+  const pessoaId = opts.pessoaId ?? null;
+
+  const [
+    saldo,
+    planejadoVsReal,
+    resumoPorCategoria,
+    resumoPorSubcategoria,
+    evolucaoPatrimonio,
+    divisaoDespesas,
+  ] = await Promise.all([
+    buscarSaldo(prisma, householdId, { ano, pessoaId: pessoaId ?? undefined }),
+    buscarSecoesPlanejadoVsReal(prisma, householdId, { ano, pessoaId }),
+    buscarResumoPorCategoria(prisma, householdId, {
+      ano,
+      pessoaId: pessoaId ?? undefined,
+    }),
+    buscarResumoPorSubcategoria(prisma, householdId, {
+      ano,
+      pessoaId: pessoaId ?? undefined,
+    }),
+    buscarEvolucaoPatrimonioTotal(prisma, householdId, ano),
+    buscarSaldoDivisaoGrupo(prisma, householdId, {
+      dataInicio: new Date(Date.UTC(ano, 0, 1)),
+      dataFim: new Date(Date.UTC(ano, 11, 31)),
+    }),
+  ]);
 
   return {
     ano,

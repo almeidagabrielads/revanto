@@ -91,7 +91,9 @@ model Pessoa {
   @@unique([householdId, nome])
 }
 
-/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+// Composição de um grupo (Pessoa tipo CASAL/FAMILIA): quais pessoas
+// INDIVIDUAL o formam e o peso relativo de cada uma na divisão dos gastos
+// atribuídos a esse grupo (ver src/lib/domain/split.ts).
 model IntegranteGrupo {
   id          String    @id @default(cuid())
   grupoId     String

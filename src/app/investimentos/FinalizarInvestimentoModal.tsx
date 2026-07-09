@@ -30,6 +30,9 @@ export function FinalizarInvestimentoModal({
   const [valorResgatado, setValorResgatado] = useState(
     (investimento.valorAtualCentavos / 100).toFixed(2),
   );
+  const [dataResgate, setDataResgate] = useState(
+    () => new Date().toISOString().slice(0, 10),
+  );
   const [reinvestir, setReinvestir] = useState(false);
   const [valorReinvestido, setValorReinvestido] = useState("");
   const [criarReceita, setCriarReceita] = useState(true);
@@ -74,6 +77,7 @@ export function FinalizarInvestimentoModal({
           valorResgatadoCentavos,
           valorReinvestidoCentavos,
           criarReceita,
+          dataResgate,
           novoInvestimento: reinvestir
             ? {
                 bancoId: novoBancoId,
@@ -123,6 +127,23 @@ export function FinalizarInvestimentoModal({
               className={inputClass}
               value={valorResgatado}
               onChange={(e) => setValorResgatado(e.target.value)}
+              required
+            />
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label
+              className="text-on-surface-variant text-xs font-semibold"
+              htmlFor="data-resgate"
+            >
+              Data do resgate/reinvestimento
+            </label>
+            <input
+              id="data-resgate"
+              type="date"
+              className={inputClass}
+              value={dataResgate}
+              onChange={(e) => setDataResgate(e.target.value)}
               required
             />
           </div>

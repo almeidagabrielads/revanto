@@ -157,6 +157,7 @@ export const FinalizarInvestimentoSchema = z
     valorResgatadoCentavos: z.number().int().nonnegative(),
     valorReinvestidoCentavos: z.number().int().nonnegative().default(0),
     criarReceita: z.boolean().default(true),
+    dataResgate: z.coerce.date().optional(),
     mesReceita: z.coerce.date().optional(),
     novoInvestimento: z
       .object({
@@ -214,6 +215,7 @@ export async function finalizarInvestimento(
 
   const valorLiquidoCentavos =
     input.valorResgatadoCentavos - input.valorReinvestidoCentavos;
+  const dataResgate = input.dataResgate ?? new Date();
 
   return prisma.$transaction(async (tx) => {
     const novoInvestimento =
@@ -242,7 +244,7 @@ export async function finalizarInvestimento(
               subtipo: "INVESTIMENTO",
               descricao: `Resgate: ${existente.produto}`,
               valorCentavos: valorLiquidoCentavos,
-              mes: primeiroDiaMes(input.mesReceita ?? new Date()),
+              mes: primeiroDiaMes(input.mesReceita ?? dataResgate),
               householdId,
               investimentoId: existente.id,
             },
@@ -253,7 +255,7 @@ export async function finalizarInvestimento(
       where: { id },
       data: {
         status: "FINALIZADO",
-        finalizadoEm: new Date(),
+        finalizadoEm: dataResgate,
         valorResgatadoCentavos: input.valorResgatadoCentavos,
         valorReinvestidoCentavos: input.valorReinvestidoCentavos,
       },
@@ -277,7 +279,7 @@ export const FAIXAS_LIQUIDEZ = [
 
 export type FaixaLiquidez = (typeof FAIXAS_LIQUIDEZ)[number];
 
-function diasParaFaixa(dias: number | null): FaixaLiquidez {
+export function diasParaFaixa(dias: number | null): FaixaLiquidez {
   if (dias === null) return "INDEFINIDO";
   if (dias <= 0) return "IMEDIATO";
   if (dias <= 30) return "ATE_30_DIAS";
@@ -287,7 +289,7 @@ function diasParaFaixa(dias: number | null): FaixaLiquidez {
   return "MAIS_DE_1_ANO";
 }
 
-function diasAteResgate(
+export function diasAteResgate(
   investimento: { liquidezDias: number | null; vencimento: Date | null },
   dataReferencia: Date,
 ): number | null {

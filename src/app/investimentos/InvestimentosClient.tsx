@@ -4,9 +4,13 @@ import { Fragment, useEffect, useMemo, useState } from "react";
 import { RelatorioInvestimentos } from "./RelatorioInvestimentos";
 import { PosicaoMensalInline } from "./PosicaoMensalInline";
 import { FinalizarInvestimentoModal } from "./FinalizarInvestimentoModal";
+import { EditarInvestimentoModal } from "./EditarInvestimentoModal";
+import { NovoInvestimentoModal } from "./NovoInvestimentoModal";
 import { useConfirmDialog } from "../components/ConfirmDialog";
 import { ColumnHeader } from "../components/ColumnHeader";
 import { useTabela, type ColunaTabela } from "../components/useTabela";
+import { filtroEstaAtivo } from "@/lib/domain/tabela";
+import { diasAteResgate, diasParaFaixa } from "@/lib/domain/investimentos";
 
 export const TIPOS_INVESTIMENTO = [
   { value: "RENDA_FIXA", label: "Renda Fixa" },
@@ -21,7 +25,7 @@ export function labelTipo(tipo: string): string {
   return TIPOS_INVESTIMENTO.find((t) => t.value === tipo)?.label ?? tipo;
 }
 
-const FAIXAS_LABEL: Record<string, string> = {
+export const FAIXAS_LABEL: Record<string, string> = {
   IMEDIATO: "Imediato (D+0)",
   ATE_30_DIAS: "Até 30 dias",
   ATE_90_DIAS: "Até 90 dias",
@@ -83,22 +87,10 @@ function labelVencimento(inv: Investimento): string {
   return "Indefinido";
 }
 
-type FormState = {
-  bancoId: string;
-  pessoaId: string;
-  tipo: TipoInvestimento;
-  produto: string;
-  valor: string;
-  modoLiquidez: "DIAS" | "DATA" | "NENHUM";
-  liquidezDias: string;
-  vencimento: string;
-  observacao: string;
-};
-
 function IconePlusCirculo() {
   return (
     <svg
-      className="h-5 w-5"
+      className="h-4 w-4"
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
@@ -129,6 +121,23 @@ function IconeFinalizar() {
   );
 }
 
+function IconeEditar() {
+  return (
+    <svg
+      className="h-4 w-4"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+      <path d="m15 5 4 4" />
+    </svg>
+  );
+}
+
 function IconeChevron({ aberto }: { aberto: boolean }) {
   return (
     <svg
@@ -145,20 +154,6 @@ function IconeChevron({ aberto }: { aberto: boolean }) {
   );
 }
 
-function formVazio(bancos: Banco[], pessoas: Pessoa[]): FormState {
-  return {
-    bancoId: bancos[0]?.id ?? "",
-    pessoaId: pessoas[0]?.id ?? "",
-    tipo: "RENDA_FIXA",
-    produto: "",
-    valor: "",
-    modoLiquidez: "DIAS",
-    liquidezDias: "0",
-    vencimento: "",
-    observacao: "",
-  };
-}
-
 export function InvestimentosClient() {
   const [bancos, setBancos] = useState<Banco[]>([]);
   const [pessoas, setPessoas] = useState<Pessoa[]>([]);
@@ -166,7 +161,8 @@ export function InvestimentosClient() {
     null,
   );
   const [liquidez, setLiquidez] = useState<FaixaLiquidez[] | null>(null);
-  const [form, setForm] = useState<FormState | null>(null);
+  const [mostrarNovoInvestimento, setMostrarNovoInvestimento] =
+    useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [naoAutenticado, setNaoAutenticado] = useState(false);
   const [reloadToken, setReloadToken] = useState(0);
@@ -174,6 +170,8 @@ export function InvestimentosClient() {
   const [toast, setToast] = useState<string | null>(null);
   const [mostrarFinalizados, setMostrarFinalizados] = useState(false);
   const [investimentoParaFinalizar, setInvestimentoParaFinalizar] =
+    useState<Investimento | null>(null);
+  const [investimentoParaEditar, setInvestimentoParaEditar] =
     useState<Investimento | null>(null);
   const { dialog: dialogConfirmacao } = useConfirmDialog();
 
@@ -210,7 +208,6 @@ export function InvestimentosClient() {
         setNaoAutenticado(false);
         setBancos(bcs);
         setPessoas(pes);
-        setForm((atual) => atual ?? formVazio(bcs, pes));
       })
       .catch(() => {
         if (!cancelado) setErro("Não foi possível carregar bancos/pessoas.");
@@ -262,31 +259,8 @@ export function InvestimentosClient() {
     };
   }, [anoPosicoes, reloadPosicoesToken]);
 
-  async function criarInvestimento(e: React.FormEvent) {
-    e.preventDefault();
-    if (!form) return;
-    setErro(null);
-
-    const response = await fetch("/api/investimentos", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        bancoId: form.bancoId,
-        pessoaId: form.pessoaId,
-        tipo: form.tipo,
-        produto: form.produto,
-        valorAtualCentavos: reaisParaCentavos(form.valor || "0"),
-        liquidezDias:
-          form.modoLiquidez === "DIAS" ? Number(form.liquidezDias) : null,
-        vencimento: form.modoLiquidez === "DATA" ? form.vencimento : null,
-        observacao: form.observacao.trim() === "" ? null : form.observacao,
-      }),
-    });
-    if (!response.ok) {
-      setErro(await parseErro(response));
-      return;
-    }
-    setForm(formVazio(bancos, pessoas));
+  function onInvestimentoCriado() {
+    setMostrarNovoInvestimento(false);
     setToast("Investimento adicionado com sucesso!");
     recarregar();
   }
@@ -294,6 +268,12 @@ export function InvestimentosClient() {
   function onInvestimentoFinalizado() {
     setInvestimentoParaFinalizar(null);
     setToast("Investimento finalizado com sucesso!");
+    recarregar();
+  }
+
+  function onInvestimentoEditado() {
+    setInvestimentoParaEditar(null);
+    setToast("Investimento atualizado com sucesso!");
     recarregar();
   }
 
@@ -330,6 +310,24 @@ export function InvestimentosClient() {
         tipo: "numero",
         acessor: (inv) => inv.valorAtualCentavos / 100,
       },
+      // Sem coluna visível na tabela — existe só para permitir filtrar a
+      // Carteira a partir de um clique no gráfico de liquidez.
+      {
+        chave: "faixaLiquidez",
+        tipo: "opcoes",
+        acessor: (inv) =>
+          FAIXAS_LABEL[
+            diasParaFaixa(
+              diasAteResgate(
+                {
+                  liquidezDias: inv.liquidezDias,
+                  vencimento: inv.vencimento ? new Date(inv.vencimento) : null,
+                },
+                new Date(),
+              ),
+            )
+          ] ?? "—",
+      },
     ],
     [bancosPorId, pessoasPorId],
   );
@@ -341,7 +339,18 @@ export function InvestimentosClient() {
     filtros,
     definirFiltro,
     limparFiltro,
+    limparTodosFiltros,
   } = useTabela(investimentos ?? [], colunasInvestimentos);
+
+  const algumFiltroAtivo = Object.values(filtros).some(filtroEstaAtivo);
+
+  function irParaCarteiraFiltrada(
+    chave: "tipo" | "banco" | "titular" | "faixaLiquidez",
+    valores: string[],
+  ) {
+    setAba("CARTEIRA");
+    definirFiltro(chave, { tipo: "opcoes", selecionadas: valores });
+  }
 
   const opcoesColunasInvestimentos = useMemo(() => {
     const base = investimentos ?? [];
@@ -366,12 +375,19 @@ export function InvestimentosClient() {
 
   const cardClass =
     "rounded-xl border border-outline-variant bg-surface-container-lowest shadow-sm";
-  const inputClass =
-    "rounded-lg border border-outline-variant bg-surface-container-lowest px-sm py-1.5 text-sm focus:border-primary focus:outline-none";
 
   return (
     <div className="gap-lg flex flex-col">
       {dialogConfirmacao}
+
+      {mostrarNovoInvestimento && (
+        <NovoInvestimentoModal
+          bancos={bancos}
+          pessoas={pessoas}
+          onClose={() => setMostrarNovoInvestimento(false)}
+          onCriado={onInvestimentoCriado}
+        />
+      )}
 
       {investimentoParaFinalizar && (
         <FinalizarInvestimentoModal
@@ -379,6 +395,16 @@ export function InvestimentosClient() {
           bancos={bancos}
           onClose={() => setInvestimentoParaFinalizar(null)}
           onFinalizado={onInvestimentoFinalizado}
+        />
+      )}
+
+      {investimentoParaEditar && (
+        <EditarInvestimentoModal
+          investimento={investimentoParaEditar}
+          bancos={bancos}
+          pessoas={pessoas}
+          onClose={() => setInvestimentoParaEditar(null)}
+          onEditado={onInvestimentoEditado}
         />
       )}
 
@@ -421,215 +447,9 @@ export function InvestimentosClient() {
           investimentos={investimentos ?? []}
           bancos={bancos}
           pessoas={pessoas}
+          liquidez={liquidez ?? []}
+          onFiltrarCarteira={irParaCarteiraFiltrada}
         />
-      )}
-
-      {aba === "CARTEIRA" && form && (
-        <div className={`${cardClass} p-lg`}>
-          <div className="mb-md border-outline-variant pb-md text-on-surface flex items-center gap-2 border-b">
-            <IconePlusCirculo />
-            <h2 className="text-base font-bold">Registrar Novo Investimento</h2>
-          </div>
-          <form
-            onSubmit={criarInvestimento}
-            className="gap-sm flex flex-wrap items-end"
-          >
-            <div className="flex flex-col gap-1">
-              <label
-                className="text-on-surface-variant text-xs font-semibold"
-                htmlFor="banco"
-              >
-                Banco
-              </label>
-              <select
-                id="banco"
-                className={inputClass}
-                value={form.bancoId}
-                onChange={(e) => setForm({ ...form, bancoId: e.target.value })}
-                required
-              >
-                {bancos.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.nome}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label
-                className="text-on-surface-variant text-xs font-semibold"
-                htmlFor="titular"
-              >
-                Titular
-              </label>
-              <select
-                id="titular"
-                className={inputClass}
-                value={form.pessoaId}
-                onChange={(e) => setForm({ ...form, pessoaId: e.target.value })}
-                required
-              >
-                {pessoas.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.nome}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label
-                className="text-on-surface-variant text-xs font-semibold"
-                htmlFor="tipo"
-              >
-                Tipo
-              </label>
-              <select
-                id="tipo"
-                className={inputClass}
-                value={form.tipo}
-                onChange={(e) =>
-                  setForm({
-                    ...form,
-                    tipo: e.target.value as TipoInvestimento,
-                  })
-                }
-              >
-                {TIPOS_INVESTIMENTO.map((t) => (
-                  <option key={t.value} value={t.value}>
-                    {t.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label
-                className="text-on-surface-variant text-xs font-semibold"
-                htmlFor="produto"
-              >
-                Produto
-              </label>
-              <input
-                id="produto"
-                className={inputClass}
-                value={form.produto}
-                onChange={(e) => setForm({ ...form, produto: e.target.value })}
-                required
-              />
-            </div>
-
-            <div className="flex flex-col gap-3">
-              <label
-                className="text-on-surface-variant text-xs font-semibold"
-                htmlFor="valor"
-              >
-                Valor atual (R$)
-              </label>
-              <input
-                id="valor"
-                type="number"
-                step="0.01"
-                placeholder="0,00"
-                className={`w-32 text-right ${inputClass}`}
-                value={form.valor}
-                onChange={(e) => setForm({ ...form, valor: e.target.value })}
-                required
-              />
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label
-                className="text-on-surface-variant text-xs font-semibold"
-                htmlFor="modo-liquidez"
-              >
-                Vencimento/liquidez
-              </label>
-              <select
-                id="modo-liquidez"
-                className={inputClass}
-                value={form.modoLiquidez}
-                onChange={(e) =>
-                  setForm({
-                    ...form,
-                    modoLiquidez: e.target.value as FormState["modoLiquidez"],
-                  })
-                }
-              >
-                <option value="DIAS">Prazo (D+n)</option>
-                <option value="DATA">Data de vencimento</option>
-                <option value="NENHUM">Indefinido</option>
-              </select>
-            </div>
-
-            {form.modoLiquidez === "DIAS" && (
-              <div className="flex flex-col gap-1">
-                <label
-                  className="text-on-surface-variant text-xs font-semibold"
-                  htmlFor="liquidez-dias"
-                >
-                  Dias (D+n)
-                </label>
-                <input
-                  id="liquidez-dias"
-                  type="number"
-                  min={0}
-                  className={`w-24 ${inputClass}`}
-                  value={form.liquidezDias}
-                  onChange={(e) =>
-                    setForm({ ...form, liquidezDias: e.target.value })
-                  }
-                />
-              </div>
-            )}
-
-            {form.modoLiquidez === "DATA" && (
-              <div className="flex flex-col gap-1">
-                <label
-                  className="text-on-surface-variant text-xs font-semibold"
-                  htmlFor="vencimento"
-                >
-                  Data
-                </label>
-                <input
-                  id="vencimento"
-                  type="date"
-                  className={inputClass}
-                  value={form.vencimento}
-                  onChange={(e) =>
-                    setForm({ ...form, vencimento: e.target.value })
-                  }
-                  required
-                />
-              </div>
-            )}
-
-            <div className="flex min-w-[180px] flex-1 flex-col gap-1">
-              <label
-                className="text-on-surface-variant text-xs font-semibold"
-                htmlFor="observacao"
-              >
-                Observação (Opcional)
-              </label>
-              <input
-                id="observacao"
-                className={inputClass}
-                value={form.observacao}
-                onChange={(e) =>
-                  setForm({ ...form, observacao: e.target.value })
-                }
-              />
-            </div>
-
-            <button
-              type="submit"
-              className="bg-primary px-md text-on-primary rounded-full py-2 text-xs font-semibold hover:opacity-90"
-            >
-              Adicionar
-            </button>
-          </form>
-        </div>
       )}
 
       {aba === "CARTEIRA" && (
@@ -643,8 +463,25 @@ export function InvestimentosClient() {
                   ? "item cadastrado"
                   : "itens cadastrados"}
               </span>
+              <button
+                type="button"
+                onClick={() => setMostrarNovoInvestimento(true)}
+                className="bg-primary text-on-primary gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold hover:opacity-90 flex items-center"
+              >
+                <IconePlusCirculo />
+                Novo Investimento
+              </button>
             </div>
             <div className="gap-md flex items-center">
+              {algumFiltroAtivo && (
+                <button
+                  type="button"
+                  onClick={limparTodosFiltros}
+                  className="text-primary hover:bg-primary-container rounded-full px-3 py-1 text-xs font-semibold transition-colors"
+                >
+                  Limpar filtros
+                </button>
+              )}
               <label className="gap-1.5 text-on-surface-variant flex cursor-pointer items-center text-xs font-semibold">
                 <input
                   type="checkbox"
@@ -799,7 +636,18 @@ export function InvestimentosClient() {
                           {formatarReais(inv.valorAtualCentavos)}
                         </td>
                         <td className="p-md">
-                          <div className="flex justify-end">
+                          <div className="flex justify-end gap-1">
+                            <button
+                              className="text-on-surface-variant hover:bg-surface-container-high rounded-full p-1.5 transition-colors"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setInvestimentoParaEditar(inv);
+                              }}
+                              title="Editar"
+                              aria-label="Editar"
+                            >
+                              <IconeEditar />
+                            </button>
                             {inv.status === "ATIVO" && (
                               <button
                                 className="text-primary hover:bg-primary-container rounded-full p-1.5 transition-colors"
@@ -847,40 +695,6 @@ export function InvestimentosClient() {
         </div>
       )}
 
-      {aba === "CARTEIRA" && (
-        <div className={cardClass}>
-          <div className="p-lg pb-md">
-            <h2 className="text-on-surface text-base font-bold">
-              Liquidez consolidada (RF15)
-            </h2>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full border-collapse text-sm">
-              <thead>
-                <tr className="border-outline-variant text-on-surface-variant border-y text-xs font-semibold tracking-wide uppercase">
-                  <th className="p-md text-left">Prazo de resgate</th>
-                  <th className="p-md text-right">Total disponível</th>
-                </tr>
-              </thead>
-              <tbody>
-                {liquidez?.map((grupo) => (
-                  <tr
-                    key={grupo.faixa}
-                    className="border-outline-variant/60 hover:bg-surface-container-low border-b"
-                  >
-                    <td className="p-md text-on-surface-variant">
-                      {FAIXAS_LABEL[grupo.faixa] ?? grupo.faixa}
-                    </td>
-                    <td className="data-tabular p-md text-right font-medium">
-                      {formatarReais(grupo.totalCentavos)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
