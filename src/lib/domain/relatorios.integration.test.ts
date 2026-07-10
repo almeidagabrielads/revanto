@@ -60,6 +60,7 @@ describe("buscarPlanejadoVsReal", () => {
       mes: 1,
       ano: 2026,
       valorCentavos: 150_000,
+      tipoGasto: "VARIAVEL",
     });
     await criarLancamento(prismaTest, household.id, {
       data: new Date(Date.UTC(2026, 0, 10)),
@@ -68,6 +69,7 @@ describe("buscarPlanejadoVsReal", () => {
       bancoId: banco.id,
       pessoaDivisaoId: isa.id,
       pessoaPagouId: isa.id,
+      tipoGasto: "VARIAVEL",
       valorCentavos: 100_000,
     });
 
@@ -115,6 +117,7 @@ describe("buscarPlanejadoVsReal", () => {
       mes: 6,
       ano: 2026,
       valorCentavos: 70_000,
+      tipoGasto: "VARIAVEL",
     });
 
     const resultado = await buscarPlanejadoVsReal(prismaTest, household.id, {
@@ -150,6 +153,7 @@ describe("buscarPlanejadoVsReal", () => {
       mes: 1,
       ano: 2026,
       valorCentavos: 50_000,
+      tipoGasto: "VARIAVEL",
     });
     await criarOrcamento(prismaTest, household.id, {
       pessoaId: gabi.id,
@@ -158,6 +162,7 @@ describe("buscarPlanejadoVsReal", () => {
       mes: 1,
       ano: 2026,
       valorCentavos: 100_000,
+      tipoGasto: "VARIAVEL",
     });
 
     const resultado = await buscarPlanejadoVsReal(prismaTest, household.id, {
@@ -182,6 +187,7 @@ describe("buscarResumoPorCategoria e buscarResumoPorSubcategoria", () => {
       bancoId: banco.id,
       pessoaDivisaoId: isa.id,
       pessoaPagouId: isa.id,
+      tipoGasto: "VARIAVEL",
       valorCentavos: 80_000,
     });
 
@@ -231,6 +237,7 @@ describe("buscarSaldo", () => {
       bancoId: banco.id,
       pessoaDivisaoId: isa.id,
       pessoaPagouId: isa.id,
+      tipoGasto: "VARIAVEL",
       valorCentavos: 200_000,
     });
 
@@ -329,6 +336,7 @@ describe("buscarSaldo", () => {
       bancoId: banco.id,
       pessoaDivisaoId: gabi.id,
       pessoaPagouId: gabi.id,
+      tipoGasto: "VARIAVEL",
       valorCentavos: 5_000,
     });
     // Gasto do grupo Família, pago pela Isa.
@@ -338,6 +346,7 @@ describe("buscarSaldo", () => {
       bancoId: banco.id,
       pessoaDivisaoId: familia.id,
       pessoaPagouId: isa.id,
+      tipoGasto: "VARIAVEL",
       valorCentavos: 100_000,
     });
 

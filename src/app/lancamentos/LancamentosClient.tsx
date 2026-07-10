@@ -29,6 +29,7 @@ type Lancamento = {
   pessoaPagouId: string;
   pagoComResgateInvestimento: boolean;
   investimentoResgateId: string | null;
+  tipoGasto: string;
 };
 
 type LinhaPreview = {
@@ -110,6 +111,16 @@ const SEM_CATEGORIA = "";
 const TAMANHO_PAGINA_REVISAO = 8;
 const TAMANHO_PAGINA_LANCAMENTOS = 25;
 
+const TIPOS_GASTO = [
+  { value: "FIXO", label: "Fixo" },
+  { value: "VARIAVEL", label: "Variável" },
+  { value: "INVESTIMENTO", label: "Investimento" },
+] as const;
+
+function labelTipoGasto(tipo: string): string {
+  return TIPOS_GASTO.find((t) => t.value === tipo)?.label ?? tipo;
+}
+
 type FormLancamento = {
   data: string;
   descricaoPropria: string;
@@ -122,6 +133,7 @@ type FormLancamento = {
   pessoaPagouId: string;
   pagoComResgateInvestimento: boolean;
   investimentoResgateId: string;
+  tipoGasto: string;
 };
 
 function formVazio(defaults: {
@@ -140,6 +152,7 @@ function formVazio(defaults: {
     pessoaPagouId: defaults.pessoaId ?? "",
     pagoComResgateInvestimento: false,
     investimentoResgateId: "",
+    tipoGasto: "VARIAVEL",
   };
 }
 
@@ -343,6 +356,11 @@ export function LancamentosClient() {
         tipo: "opcoes",
         acessor: (l) => nome.pessoa(l.pessoaPagouId),
       },
+      {
+        chave: "tipoGasto",
+        tipo: "opcoes",
+        acessor: (l) => labelTipoGasto(l.tipoGasto),
+      },
     ],
     [nome],
   );
@@ -373,6 +391,7 @@ export function LancamentosClient() {
       banco: unicos(base.map((l) => nome.banco(l.bancoId))),
       divisao: unicos(base.map((l) => nome.pessoa(l.pessoaDivisaoId))),
       pagou: unicos(base.map((l) => nome.pessoa(l.pessoaPagouId))),
+      tipoGasto: unicos(base.map((l) => labelTipoGasto(l.tipoGasto))),
     };
   }, [lancamentos, nome]);
 
@@ -415,6 +434,7 @@ export function LancamentosClient() {
         pessoaPagouId: form.pessoaPagouId,
         pagoComResgateInvestimento: form.pagoComResgateInvestimento,
         investimentoResgateId: form.investimentoResgateId || null,
+        tipoGasto: form.tipoGasto,
       }),
     });
     if (!response.ok) {
@@ -786,7 +806,7 @@ export function LancamentosClient() {
             </div>
           </div>
 
-          <div className="gap-sm grid grid-cols-1 sm:grid-cols-3">
+          <div className="gap-sm grid grid-cols-1 sm:grid-cols-4">
             <div className="flex flex-col gap-1">
               <label
                 className="text-on-surface-variant text-xs font-semibold"
@@ -801,6 +821,23 @@ export function LancamentosClient() {
                 options={pessoas.map((p) => ({
                   value: p.id,
                   label: `${p.nome}${p.tipo === "CASAL" ? " (50/50)" : ""}`,
+                }))}
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label
+                className="text-on-surface-variant text-xs font-semibold"
+                htmlFor="l-tipo-gasto"
+              >
+                Tipo de gasto
+              </label>
+              <Select
+                id="l-tipo-gasto"
+                value={form.tipoGasto}
+                onChange={(v) => setForm({ ...form, tipoGasto: v })}
+                options={TIPOS_GASTO.map((t) => ({
+                  value: t.value,
+                  label: t.label,
                 }))}
               />
             </div>
@@ -1433,6 +1470,17 @@ export function LancamentosClient() {
                 onFiltrar={aoFiltrarColuna}
                 onLimparFiltro={aoLimparFiltroColuna}
               />
+              <ColumnHeader
+                label="Tipo de gasto"
+                chave="tipoGasto"
+                tipo="opcoes"
+                opcoes={opcoesColunas.tipoGasto}
+                ordenacao={ordenacao}
+                onOrdenar={aoOrdenarColuna}
+                filtro={filtros.tipoGasto}
+                onFiltrar={aoFiltrarColuna}
+                onLimparFiltro={aoLimparFiltroColuna}
+              />
               <th className="p-2"></th>
             </tr>
           </thead>
@@ -1589,6 +1637,9 @@ function LinhaLancamento({
       <td className="p-2 whitespace-nowrap">
         {nome.pessoa(lancamento.pessoaPagouId)}
       </td>
+      <td className="p-2 whitespace-nowrap">
+        {labelTipoGasto(lancamento.tipoGasto)}
+      </td>
       <td className="p-2" onClick={(e) => e.stopPropagation()}>
         <button
           className="text-danger hover:bg-surface-container rounded-full p-1.5 transition-colors"
@@ -1656,6 +1707,7 @@ function DetalheLancamentoDrawer({
   const [investimentoResgateId, setInvestimentoResgateId] = useState(
     lancamento.investimentoResgateId ?? "",
   );
+  const [tipoGasto, setTipoGasto] = useState(lancamento.tipoGasto);
   const [salvando, setSalvando] = useState(false);
 
   const subcategoriasDaCategoria =
@@ -1677,6 +1729,7 @@ function DetalheLancamentoDrawer({
         investimentoResgateId: pagoComResgateInvestimento
           ? investimentoResgateId || null
           : null,
+        tipoGasto,
       });
       onFechar();
     } finally {
@@ -1816,7 +1869,7 @@ function DetalheLancamentoDrawer({
           />
         </div>
 
-        <div className="gap-sm grid grid-cols-2">
+        <div className="gap-sm grid grid-cols-2 sm:grid-cols-3">
           <div className="flex flex-col gap-1">
             <label className={labelClass} htmlFor="dt-divisao">
               Divisão
@@ -1837,6 +1890,20 @@ function DetalheLancamentoDrawer({
               value={pessoaPagouId}
               onChange={setPessoaPagouId}
               options={pessoas.map((p) => ({ value: p.id, label: p.nome }))}
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className={labelClass} htmlFor="dt-tipo-gasto">
+              Tipo de gasto
+            </label>
+            <Select
+              id="dt-tipo-gasto"
+              value={tipoGasto}
+              onChange={setTipoGasto}
+              options={TIPOS_GASTO.map((t) => ({
+                value: t.value,
+                label: t.label,
+              }))}
             />
           </div>
         </div>

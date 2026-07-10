@@ -54,6 +54,7 @@ describe("criarOrcamento", () => {
       mes: 6,
       ano: 2026,
       valorCentavos: 150000,
+      tipoGasto: "VARIAVEL",
     });
 
     expect(orcamento?.householdId).toBe(household.id);
@@ -74,6 +75,7 @@ describe("criarOrcamento", () => {
       categoriaId: categoria.id,
       ano: 2026,
       valorCentavos: 1200000,
+      tipoGasto: "VARIAVEL",
     });
 
     expect(orcamento).toBeNull();
@@ -92,6 +94,7 @@ describe("criarOrcamento", () => {
       categoriaId: categoria.id,
       ano: 2026,
       valorCentavos: 1000,
+      tipoGasto: "VARIAVEL",
     });
 
     expect(orcamento).toBeNull();
@@ -113,6 +116,7 @@ describe("criarOrcamento", () => {
       categoriaId: categoriaDeOutraCasa.id,
       ano: 2026,
       valorCentavos: 1000,
+      tipoGasto: "VARIAVEL",
     });
 
     expect(orcamento).toBeNull();
@@ -138,6 +142,7 @@ describe("criarOrcamento", () => {
       subcategoriaId: subOutraCategoria!.id,
       ano: 2026,
       valorCentavos: 1000,
+      tipoGasto: "VARIAVEL",
     });
 
     expect(orcamento).toBeNull();
@@ -153,6 +158,7 @@ describe("atualizarOrcamento", () => {
       mes: 1,
       ano: 2026,
       valorCentavos: 100000,
+      tipoGasto: "VARIAVEL",
     });
 
     const atualizado = await atualizarOrcamento(
@@ -186,6 +192,7 @@ describe("removerOrcamento", () => {
       categoriaId: categoria.id,
       ano: 2026,
       valorCentavos: 100000,
+      tipoGasto: "VARIAVEL",
     });
 
     const removido = await removerOrcamento(
@@ -211,6 +218,7 @@ describe("buscarOrcamento", () => {
       categoriaId: categoria.id,
       ano: 2026,
       valorCentavos: 1000,
+      tipoGasto: "VARIAVEL",
     });
 
     const resultado = await buscarOrcamento(prismaTest, h2.id, orcamento!.id);
@@ -230,12 +238,14 @@ describe("listarOrcamentos (filtros)", () => {
       categoriaId: categoria.id,
       ano: 2026,
       valorCentavos: 100000,
+      tipoGasto: "VARIAVEL",
     });
     await criarOrcamento(prismaTest, household.id, {
       pessoaId: gabi.id,
       categoriaId: categoria.id,
       ano: 2026,
       valorCentavos: 200000,
+      tipoGasto: "VARIAVEL",
     });
 
     const orcamentos = await listarOrcamentos(prismaTest, household.id, {
@@ -254,6 +264,7 @@ describe("listarOrcamentos (filtros)", () => {
       mes: 1,
       ano: 2026,
       valorCentavos: 100000,
+      tipoGasto: "VARIAVEL",
     });
     await criarOrcamento(prismaTest, household.id, {
       pessoaId: isa.id,
@@ -261,6 +272,7 @@ describe("listarOrcamentos (filtros)", () => {
       mes: 2,
       ano: 2026,
       valorCentavos: 200000,
+      tipoGasto: "VARIAVEL",
     });
     await criarOrcamento(prismaTest, household.id, {
       pessoaId: isa.id,
@@ -268,6 +280,7 @@ describe("listarOrcamentos (filtros)", () => {
       mes: 1,
       ano: 2025,
       valorCentavos: 300000,
+      tipoGasto: "VARIAVEL",
     });
 
     const orcamentos = await listarOrcamentos(prismaTest, household.id, {

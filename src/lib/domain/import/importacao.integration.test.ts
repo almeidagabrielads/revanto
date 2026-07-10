@@ -197,6 +197,7 @@ describe("gerarPreviewImportacao — sugestão de categoria", () => {
       bancoId: banco.id,
       pessoaDivisaoId: isa.id,
       pessoaPagouId: isa.id,
+      tipoGasto: "VARIAVEL",
     });
 
     const preview = await gerarPreviewImportacao(prismaTest, h.id, {
@@ -232,6 +233,7 @@ describe("gerarPreviewImportacao — sugestão de categoria", () => {
       bancoId: banco.id,
       pessoaDivisaoId: isa.id,
       pessoaPagouId: isa.id,
+      tipoGasto: "VARIAVEL",
     });
     // Simula que esse mesmo lançamento já veio de uma importação anterior,
     // atribuindo o hash que o CSV de exemplo geraria para essa linha.

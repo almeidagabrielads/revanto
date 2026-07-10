@@ -52,12 +52,20 @@ type Pessoa = { id: string; nome: string; tipo: string };
 type OrcamentoItem = {
   id: string;
   pessoaId: string | null;
+  divisaoId: string | null;
   categoriaId: string;
   subcategoriaId: string | null;
   mes: number | null;
   ano: number;
   valorCentavos: number;
+  tipoGasto: string;
 };
+
+const TIPOS_GASTO = [
+  { value: "FIXO", label: "Fixo" },
+  { value: "VARIAVEL", label: "Variável" },
+  { value: "INVESTIMENTO", label: "Investimento" },
+] as const;
 
 type IndicadorPlanejado = {
   planejadoCentavos: number;
@@ -109,6 +117,41 @@ function chave(
 
 function chaveCategoria(categoriaId: string, subcategoriaId: string | null) {
   return `${categoriaId}::${subcategoriaId ?? ""}`;
+}
+
+// Agrupa os itens de orçamento por categoria/subcategoria, ordenados por mês
+// (mes ausente = vigente desde o mês 1). Usado para achar a divisão/tipo de
+// gasto vigentes num mês sem entrada própria — mesmo princípio do valor
+// vigente (ver relatorios.ts), calculado no cliente porque divisão e tipo de
+// gasto não são numéricos e não passam pelo relatório planejado vs. real.
+function agruparPorSubcategoria(
+  itens: OrcamentoItem[],
+): Map<string, OrcamentoItem[]> {
+  const mapa = new Map<string, OrcamentoItem[]>();
+  for (const item of itens) {
+    const k = chaveCategoria(item.categoriaId, item.subcategoriaId);
+    const lista = mapa.get(k) ?? [];
+    lista.push(item);
+    mapa.set(k, lista);
+  }
+  for (const lista of mapa.values()) {
+    lista.sort((a, b) => (a.mes ?? 1) - (b.mes ?? 1));
+  }
+  return mapa;
+}
+
+function vigenteExtra(
+  itensDaSubcategoria: OrcamentoItem[] | undefined,
+  mes: number,
+): { divisaoId: string | null; tipoGasto: string } {
+  let vigente: OrcamentoItem | undefined;
+  for (const item of itensDaSubcategoria ?? []) {
+    if ((item.mes ?? 1) <= mes) vigente = item;
+  }
+  return {
+    divisaoId: vigente?.divisaoId ?? null,
+    tipoGasto: vigente?.tipoGasto ?? "VARIAVEL",
+  };
 }
 
 // A API já filtra categorias inativas por padrão, mas não filtra
@@ -313,6 +356,7 @@ export function OrcamentoClient() {
           pessoaFiltro={pessoaFiltro}
           editavel={!!editavel}
           categorias={categorias}
+          pessoas={pessoas}
           setErro={setErro}
         />
       )}
@@ -322,6 +366,7 @@ export function OrcamentoClient() {
           pessoaFiltro={pessoaFiltro}
           editavel={!!editavel}
           categorias={categorias}
+          pessoas={pessoas}
           setErro={setErro}
         />
       )}
@@ -388,6 +433,7 @@ function VisaoMesAtual({
   pessoaFiltro,
   editavel,
   categorias,
+  pessoas,
   setErro,
 }: {
   ano: number;
@@ -395,6 +441,7 @@ function VisaoMesAtual({
   pessoaFiltro: string;
   editavel: boolean;
   categorias: Categoria[] | null;
+  pessoas: Pessoa[];
   setErro: (msg: string | null) => void;
 }) {
   const [dados, setDados] = useState<PlanejadoVsRealCategoria[] | null>(null);
@@ -464,11 +511,20 @@ function VisaoMesAtual({
     return mapa;
   }, [orcamentosRaw]);
 
+  const itensPorSubcategoria = useMemo(
+    () => agruparPorSubcategoria(orcamentosRaw ?? []),
+    [orcamentosRaw],
+  );
+
   async function salvarPlanejadoSubcategoria(
     categoriaId: string,
     subcategoriaId: string,
     valorTexto: string,
+    divisaoIdSelecionada: string | null,
+    tipoGastoSelecionado: string,
     valorExibidoAntesCentavos: number,
+    divisaoIdAntes: string | null,
+    tipoGastoAntes: string,
   ) {
     setErro(null);
     const existente = mapaOrcamentosRaw.get(
@@ -477,12 +533,20 @@ function VisaoMesAtual({
     const valorCentavos =
       valorTexto.trim() === "" ? 0 : reaisParaCentavos(valorTexto);
 
-    // Sem edição real: o campo só exibia o valor vigente (mês anterior ou
-    // limite sugerido da subcategoria), nada foi de fato alterado.
-    if (!existente && valorCentavos === valorExibidoAntesCentavos) return;
+    // Sem edição real: os três campos só exibiam o que já está vigente (mês
+    // anterior ou limite sugerido da subcategoria), nada foi de fato
+    // alterado.
+    if (
+      !existente &&
+      valorCentavos === valorExibidoAntesCentavos &&
+      divisaoIdSelecionada === divisaoIdAntes &&
+      tipoGastoSelecionado === tipoGastoAntes
+    ) {
+      return;
+    }
 
-    // Campo limpo (voltar a herdar o valor vigente): remove o valor
-    // específico deste mês, se houver.
+    // Campo de valor limpo (voltar a herdar o vigente): remove a entrada
+    // específica deste mês, se houver — divisão/tipo do mês somem junto.
     if (existente && valorTexto.trim() === "") {
       const response = await fetch(`/api/orcamentos/${existente.id}`, {
         method: "DELETE",
@@ -496,11 +560,21 @@ function VisaoMesAtual({
     }
 
     if (existente) {
-      if (existente.valorCentavos === valorCentavos) return;
+      if (
+        existente.valorCentavos === valorCentavos &&
+        existente.divisaoId === divisaoIdSelecionada &&
+        existente.tipoGasto === tipoGastoSelecionado
+      ) {
+        return;
+      }
       const response = await fetch(`/api/orcamentos/${existente.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ valorCentavos }),
+        body: JSON.stringify({
+          valorCentavos,
+          divisaoId: divisaoIdSelecionada,
+          tipoGasto: tipoGastoSelecionado,
+        }),
       });
       if (!response.ok) {
         setErro(await parseErro(response));
@@ -522,6 +596,8 @@ function VisaoMesAtual({
         mes,
         ano,
         valorCentavos,
+        divisaoId: divisaoIdSelecionada,
+        tipoGasto: tipoGastoSelecionado,
       }),
     });
     if (!response.ok) {
@@ -747,6 +823,8 @@ function VisaoMesAtual({
           <thead>
             <tr className="border-outline-variant text-on-surface-variant border-b text-xs font-semibold tracking-wide uppercase">
               <th className="p-3 text-left">Categoria / Subcategoria</th>
+              <th className="p-3 text-left">Divisão</th>
+              <th className="p-3 text-left">Tipo de gasto</th>
               <th className="p-3 text-right">Planejado (R$)</th>
               <th className="p-3 text-right">Real (R$)</th>
               <th className="p-3 text-right">Diferença</th>
@@ -779,6 +857,16 @@ function VisaoMesAtual({
                         (indSub.planejadoCentavos > 0
                           ? indSub.planejadoCentavos
                           : 0);
+                      const extraVigente = vigenteExtra(
+                        itensPorSubcategoria.get(
+                          chaveCategoria(categoria.id, sub.id),
+                        ),
+                        mes,
+                      );
+                      const divisaoExibida =
+                        itemRaw?.divisaoId ?? extraVigente.divisaoId;
+                      const tipoExibido =
+                        itemRaw?.tipoGasto ?? extraVigente.tipoGasto;
                       return (
                         <LinhaMes
                           key={sub.id}
@@ -789,12 +877,19 @@ function VisaoMesAtual({
                               ? {
                                   valorCentavos: valorExibidoCentavos,
                                   itemId: itemRaw?.id,
-                                  onSalvar: (texto) =>
+                                  divisaoId: divisaoExibida,
+                                  tipoGasto: tipoExibido,
+                                  pessoas,
+                                  onSalvar: (texto, divisaoId, tipoGasto) =>
                                     salvarPlanejadoSubcategoria(
                                       categoria.id,
                                       sub.id,
                                       texto,
+                                      divisaoId,
+                                      tipoGasto,
                                       valorExibidoCentavos,
+                                      divisaoExibida,
+                                      tipoExibido,
                                     ),
                                 }
                               : undefined
@@ -916,10 +1011,157 @@ function AnelProgresso({
   );
 }
 
+// Uma "célula" de orçamento editável: valor + divisão + tipo de gasto,
+// sempre salvos juntos (mudar qualquer um dos três grava a linha do mês com
+// o estado atual dos outros dois) — evita salvar um campo sem os outros.
+// Usado tanto pela aba Mês Atual (uma célula por subcategoria) quanto pela
+// Visão Anual (uma célula por mês por subcategoria).
+function CampoOrcamento({
+  valorCentavos,
+  temRegistro,
+  divisaoId,
+  tipoGasto,
+  pessoas,
+  onSalvar,
+}: {
+  valorCentavos: number;
+  temRegistro: boolean;
+  divisaoId: string | null;
+  tipoGasto: string;
+  pessoas: Pessoa[];
+  onSalvar: (
+    valorTexto: string,
+    divisaoId: string | null,
+    tipoGasto: string,
+  ) => void;
+}) {
+  const [valorTexto, setValorTexto] = useState(
+    valorCentavos > 0 || temRegistro ? (valorCentavos / 100).toFixed(2) : "",
+  );
+  const [divisaoSelecionada, setDivisaoSelecionada] = useState(
+    divisaoId ?? "",
+  );
+  const [tipoSelecionado, setTipoSelecionado] = useState(tipoGasto);
+
+  return (
+    <>
+      <td className="p-1">
+        <Select
+          value={divisaoSelecionada}
+          onChange={(v) => {
+            setDivisaoSelecionada(v);
+            onSalvar(valorTexto, v || null, tipoSelecionado);
+          }}
+          placeholder="Divisão"
+          className="w-full text-xs"
+          options={pessoas.map((p) => ({ value: p.id, label: p.nome }))}
+        />
+      </td>
+      <td className="p-1">
+        <Select
+          value={tipoSelecionado}
+          onChange={(v) => {
+            setTipoSelecionado(v);
+            onSalvar(valorTexto, divisaoSelecionada || null, v);
+          }}
+          placeholder="Tipo de gasto"
+          className="w-full text-xs"
+          options={TIPOS_GASTO.map((t) => ({ value: t.value, label: t.label }))}
+        />
+      </td>
+      <td className="p-1 text-right">
+        <input
+          type="number"
+          step="0.01"
+          value={valorTexto}
+          onChange={(e) => setValorTexto(e.target.value)}
+          onBlur={() =>
+            onSalvar(valorTexto, divisaoSelecionada || null, tipoSelecionado)
+          }
+          className="border-outline-variant bg-surface-container-lowest data-tabular w-24 rounded-lg border px-1.5 py-1 text-right"
+        />
+      </td>
+    </>
+  );
+}
+
+// Versão compacta de CampoOrcamento: os três controles (valor, divisão, tipo
+// de gasto) empilhados numa única célula — usada na Visão Anual, onde cada
+// mês já é uma coluna e não caberiam 3 colunas a mais por mês.
+function CampoOrcamentoCompacto({
+  valorCentavos,
+  temRegistro,
+  divisaoId,
+  tipoGasto,
+  pessoas,
+  onSalvar,
+}: {
+  valorCentavos: number;
+  temRegistro: boolean;
+  divisaoId: string | null;
+  tipoGasto: string;
+  pessoas: Pessoa[];
+  onSalvar: (
+    valorTexto: string,
+    divisaoId: string | null,
+    tipoGasto: string,
+  ) => void;
+}) {
+  const [valorTexto, setValorTexto] = useState(
+    valorCentavos > 0 || temRegistro ? (valorCentavos / 100).toFixed(2) : "",
+  );
+  const [divisaoSelecionada, setDivisaoSelecionada] = useState(
+    divisaoId ?? "",
+  );
+  const [tipoSelecionado, setTipoSelecionado] = useState(tipoGasto);
+
+  return (
+    <div className="gap-1 flex flex-col items-stretch">
+      <input
+        type="number"
+        step="0.01"
+        value={valorTexto}
+        onChange={(e) => setValorTexto(e.target.value)}
+        onBlur={() =>
+          onSalvar(valorTexto, divisaoSelecionada || null, tipoSelecionado)
+        }
+        className="border-outline-variant bg-surface-container-lowest data-tabular w-28 rounded-lg border px-1.5 py-1 text-right"
+      />
+      <Select
+        value={divisaoSelecionada}
+        onChange={(v) => {
+          setDivisaoSelecionada(v);
+          onSalvar(valorTexto, v || null, tipoSelecionado);
+        }}
+        placeholder="Divisão"
+        className="w-28 text-xs"
+        options={pessoas.map((p) => ({ value: p.id, label: p.nome }))}
+      />
+      <Select
+        value={tipoSelecionado}
+        onChange={(v) => {
+          setTipoSelecionado(v);
+          onSalvar(valorTexto, divisaoSelecionada || null, v);
+        }}
+        placeholder="Tipo de gasto"
+        className="w-28 text-xs"
+        options={TIPOS_GASTO.map((t) => ({ value: t.value, label: t.label }))}
+      />
+    </div>
+  );
+}
+
 type PlanejadoEditavel = {
   valorCentavos: number;
   itemId?: string;
-  onSalvar: (valorTexto: string) => void;
+  divisaoId: string | null;
+  tipoGasto: string;
+  pessoas: Pessoa[];
+  onSalvar: (
+    valorTexto: string,
+    divisaoId: string | null,
+    tipoGasto: string,
+  ) => void;
 };
 
 function LinhaMes({
@@ -968,31 +1210,28 @@ function LinhaMes({
           {label}
         </span>
       </td>
-      <td
-        className={
-          planejadoEditavel ? "p-1 text-right" : "data-tabular p-3 text-right"
-        }
-      >
-        {planejadoEditavel ? (
-          <input
-            type="number"
-            step="0.01"
-            key={
-              planejadoEditavel.itemId ??
-              `${label}-${planejadoEditavel.valorCentavos}`
-            }
-            defaultValue={
-              planejadoEditavel.valorCentavos > 0 || planejadoEditavel.itemId
-                ? (planejadoEditavel.valorCentavos / 100).toFixed(2)
-                : ""
-            }
-            className="border-outline-variant bg-surface-container-lowest data-tabular w-24 rounded-lg border px-1.5 py-1 text-right"
-            onBlur={(e) => planejadoEditavel.onSalvar(e.target.value)}
-          />
-        ) : (
-          centavosParaReais(indicador.planejadoCentavos)
-        )}
-      </td>
+      {planejadoEditavel ? (
+        <CampoOrcamento
+          key={
+            planejadoEditavel.itemId ??
+            `${label}-${planejadoEditavel.valorCentavos}-${planejadoEditavel.divisaoId}-${planejadoEditavel.tipoGasto}`
+          }
+          valorCentavos={planejadoEditavel.valorCentavos}
+          temRegistro={!!planejadoEditavel.itemId}
+          divisaoId={planejadoEditavel.divisaoId}
+          tipoGasto={planejadoEditavel.tipoGasto}
+          pessoas={planejadoEditavel.pessoas}
+          onSalvar={planejadoEditavel.onSalvar}
+        />
+      ) : (
+        <>
+          <td className="p-3"></td>
+          <td className="p-3"></td>
+          <td className="data-tabular p-3 text-right">
+            {centavosParaReais(indicador.planejadoCentavos)}
+          </td>
+        </>
+      )}
       <td className="data-tabular p-3 text-right">
         {centavosParaReais(indicador.realCentavos)}
       </td>
@@ -1018,12 +1257,14 @@ function VisaoAnual({
   pessoaFiltro,
   editavel,
   categorias,
+  pessoas,
   setErro,
 }: {
   ano: number;
   pessoaFiltro: string;
   editavel: boolean;
   categorias: Categoria[] | null;
+  pessoas: Pessoa[];
   setErro: (msg: string | null) => void;
 }) {
   const [orcamentos, setOrcamentos] = useState<OrcamentoItem[] | null>(null);
@@ -1090,6 +1331,11 @@ function VisaoAnual({
     return mapa;
   }, [orcamentos]);
 
+  const itensPorSubcategoria = useMemo(
+    () => agruparPorSubcategoria(orcamentos ?? []),
+    [orcamentos],
+  );
+
   const mapaDados = useMemo(() => {
     const mapa = new Map<string, PlanejadoVsRealCategoria>();
     for (const c of dados ?? []) {
@@ -1132,7 +1378,11 @@ function VisaoAnual({
     subcategoriaId: string | null,
     mes: number,
     valorTexto: string,
+    divisaoIdSelecionada: string | null,
+    tipoGastoSelecionado: string,
     valorVigenteAntes: number,
+    divisaoIdAntes: string | null,
+    tipoGastoAntes: string,
   ) {
     setErro(null);
     const existente = mapaOrcamentos.get(
@@ -1141,12 +1391,20 @@ function VisaoAnual({
     const valorCentavos =
       valorTexto.trim() === "" ? 0 : reaisParaCentavos(valorTexto);
 
-    // Sem edição real: o campo só exibia o valor vigente herdado (mês
-    // anterior ou limite sugerido da subcategoria), nada foi de fato alterado.
-    if (!existente && valorCentavos === valorVigenteAntes) return;
+    // Sem edição real: os três campos só exibiam o que já está vigente (mês
+    // anterior ou limite sugerido da subcategoria), nada foi de fato
+    // alterado.
+    if (
+      !existente &&
+      valorCentavos === valorVigenteAntes &&
+      divisaoIdSelecionada === divisaoIdAntes &&
+      tipoGastoSelecionado === tipoGastoAntes
+    ) {
+      return;
+    }
 
-    // Campo limpo (voltar a herdar o valor vigente): remove o valor
-    // específico deste mês, se houver.
+    // Campo de valor limpo (voltar a herdar o vigente): remove a entrada
+    // específica deste mês, se houver — divisão/tipo do mês somem junto.
     if (existente && valorTexto.trim() === "") {
       const response = await fetch(`/api/orcamentos/${existente.id}`, {
         method: "DELETE",
@@ -1160,11 +1418,21 @@ function VisaoAnual({
     }
 
     if (existente) {
-      if (existente.valorCentavos === valorCentavos) return;
+      if (
+        existente.valorCentavos === valorCentavos &&
+        existente.divisaoId === divisaoIdSelecionada &&
+        existente.tipoGasto === tipoGastoSelecionado
+      ) {
+        return;
+      }
       const response = await fetch(`/api/orcamentos/${existente.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ valorCentavos }),
+        body: JSON.stringify({
+          valorCentavos,
+          divisaoId: divisaoIdSelecionada,
+          tipoGasto: tipoGastoSelecionado,
+        }),
       });
       if (!response.ok) {
         setErro(await parseErro(response));
@@ -1186,6 +1454,8 @@ function VisaoAnual({
         mes,
         ano,
         valorCentavos,
+        divisaoId: divisaoIdSelecionada,
+        tipoGasto: tipoGastoSelecionado,
       }),
     });
     if (!response.ok) {
@@ -1225,10 +1495,12 @@ function VisaoAnual({
                   categoriaId={categoria.id}
                   subcategoriaId={null}
                   mapaOrcamentos={mapaOrcamentos}
+                  itensPorSubcategoria={itensPorSubcategoria}
                   valorVigenteMes={valorVigenteMes}
                   totalAnual={totalAnualCategoria(categoria)}
                   onSalvar={salvarCelula}
                   editavel={editavel}
+                  pessoas={pessoas}
                   destaque
                 />
                 {categoria.subcategorias.map((sub) => (
@@ -1238,10 +1510,12 @@ function VisaoAnual({
                     categoriaId={categoria.id}
                     subcategoriaId={sub.id}
                     mapaOrcamentos={mapaOrcamentos}
+                    itensPorSubcategoria={itensPorSubcategoria}
                     valorVigenteMes={valorVigenteMes}
                     totalAnual={totalAnualSubcategoria(categoria.id, sub.id)}
                     onSalvar={salvarCelula}
                     editavel={editavel}
+                    pessoas={pessoas}
                   />
                 ))}
               </Fragment>
@@ -1265,16 +1539,19 @@ function LinhaOrcamento({
   categoriaId,
   subcategoriaId,
   mapaOrcamentos,
+  itensPorSubcategoria,
   valorVigenteMes,
   totalAnual,
   onSalvar,
   editavel,
+  pessoas,
   destaque = false,
 }: {
   label: string;
   categoriaId: string;
   subcategoriaId: string | null;
   mapaOrcamentos: Map<string, OrcamentoItem>;
+  itensPorSubcategoria: Map<string, OrcamentoItem[]>;
   valorVigenteMes: (
     categoriaId: string,
     subcategoriaId: string | null,
@@ -1286,9 +1563,14 @@ function LinhaOrcamento({
     subcategoriaId: string | null,
     mes: number,
     valorTexto: string,
+    divisaoId: string | null,
+    tipoGasto: string,
     valorVigenteAntes: number,
+    divisaoIdAntes: string | null,
+    tipoGastoAntes: string,
   ) => Promise<void>;
   editavel: boolean;
+  pessoas: Pessoa[];
   destaque?: boolean;
 }) {
   return (
@@ -1314,29 +1596,39 @@ function LinhaOrcamento({
         const valorVigente = item
           ? item.valorCentavos
           : valorVigenteMes(categoriaId, subcategoriaId, mes);
+        const extraVigente = vigenteExtra(
+          itensPorSubcategoria.get(chaveCategoria(categoriaId, subcategoriaId)),
+          mes,
+        );
+        const divisaoExibida = item?.divisaoId ?? extraVigente.divisaoId;
+        const tipoExibido = item?.tipoGasto ?? extraVigente.tipoGasto;
         return (
-          <td key={mes} className={editavel ? "p-1" : "data-tabular p-2 text-right"}>
+          <td
+            key={mes}
+            className={editavel ? "p-1" : "data-tabular p-2 text-right"}
+          >
             {editavel ? (
-              <input
-                type="number"
-                step="0.01"
-                defaultValue={
-                  valorVigente > 0 || item
-                    ? (valorVigente / 100).toFixed(2)
-                    : ""
-                }
+              <CampoOrcamentoCompacto
                 key={
                   item?.id ??
-                  `${chave(categoriaId, subcategoriaId, mes)}-${valorVigente}`
+                  `${chave(categoriaId, subcategoriaId, mes)}-${valorVigente}-${divisaoExibida}-${tipoExibido}`
                 }
-                className="border-outline-variant bg-surface-container-lowest w-24 rounded-lg border px-1.5 py-1 text-right"
-                onBlur={(e) =>
+                valorCentavos={valorVigente}
+                temRegistro={!!item}
+                divisaoId={divisaoExibida}
+                tipoGasto={tipoExibido}
+                pessoas={pessoas}
+                onSalvar={(valorTexto, divisaoId, tipoGasto) =>
                   onSalvar(
                     categoriaId,
                     subcategoriaId,
                     mes,
-                    e.target.value,
+                    valorTexto,
+                    divisaoId,
+                    tipoGasto,
                     valorVigente,
+                    divisaoExibida,
+                    tipoExibido,
                   )
                 }
               />

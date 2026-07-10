@@ -1,11 +1,16 @@
 import * as z from "zod";
 import type { PrismaClient } from "@/generated/prisma/client";
+import { TipoGastoSchema } from "./tipoGasto";
 
 export const CriarOrcamentoSchema = z.object({
   // Sempre uma Pessoa INDIVIDUAL (ver validarReferencias). O orçamento de um
   // grupo (CASAL/FAMILIA/OUTRO) não é armazenado — é a soma dos orçamentos
   // dos seus integrantes, calculada em src/lib/domain/relatorios.ts.
   pessoaId: z.string().trim().min(1, "Pessoa é obrigatória."),
+  // Com quem esse gasto planejado é dividido (qualquer Pessoa, inclusive
+  // grupo) — igual ao pessoaDivisaoId do Lancamento, mas opcional e
+  // independente do pessoaId acima.
+  divisaoId: z.string().trim().min(1).nullish(),
   categoriaId: z.string().trim().min(1, "Categoria é obrigatória."),
   subcategoriaId: z.string().trim().min(1).nullish(),
   // Valor vigente a partir desse mês, até o próximo mês com valor próprio.
@@ -17,6 +22,7 @@ export const CriarOrcamentoSchema = z.object({
     .number()
     .int("Valor deve ser um inteiro em centavos.")
     .nonnegative("Valor não pode ser negativo."),
+  tipoGasto: TipoGastoSchema,
 });
 
 export const AtualizarOrcamentoSchema = CriarOrcamentoSchema.partial();
@@ -61,6 +67,7 @@ async function validarReferencias(
   householdId: string,
   input: {
     pessoaId?: string | null;
+    divisaoId?: string | null;
     categoriaId?: string;
     subcategoriaId?: string | null;
   },
@@ -70,6 +77,13 @@ async function validarReferencias(
       where: { id: input.pessoaId, householdId },
     });
     if (!pessoa || pessoa.tipo !== "INDIVIDUAL") return false;
+  }
+
+  if (input.divisaoId) {
+    const divisao = await prisma.pessoa.findFirst({
+      where: { id: input.divisaoId, householdId },
+    });
+    if (!divisao) return false;
   }
 
   if (input.categoriaId) {
@@ -107,8 +121,10 @@ export async function criarOrcamento(
       valorCentavos: input.valorCentavos,
       ano: input.ano,
       pessoaId: input.pessoaId,
+      divisaoId: input.divisaoId ?? null,
       subcategoriaId: input.subcategoriaId ?? null,
       mes: input.mes ?? null,
+      tipoGasto: input.tipoGasto,
       householdId,
     },
   });
@@ -125,6 +141,7 @@ export async function atualizarOrcamento(
 
   const valido = await validarReferencias(prisma, householdId, {
     pessoaId: input.pessoaId ?? undefined,
+    divisaoId: input.divisaoId ?? undefined,
     categoriaId: input.categoriaId ?? existente.categoriaId,
     subcategoriaId: input.subcategoriaId ?? undefined,
   });

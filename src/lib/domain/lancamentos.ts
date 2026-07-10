@@ -1,6 +1,7 @@
 import * as z from "zod";
 import type { PrismaClient } from "@/generated/prisma/client";
 import { resolverFracaoPorGrupo } from "./pessoas";
+import { TipoGastoSchema } from "./tipoGasto";
 
 export const CriarLancamentoSchema = z.object({
   data: z.coerce.date(),
@@ -20,6 +21,7 @@ export const CriarLancamentoSchema = z.object({
   pessoaPagouId: z.string().trim().min(1, "Quem pagou é obrigatório."),
   pagoComResgateInvestimento: z.boolean().default(false),
   investimentoResgateId: z.string().trim().min(1).nullish(),
+  tipoGasto: TipoGastoSchema,
 });
 
 export const AtualizarLancamentoSchema = CriarLancamentoSchema.partial();

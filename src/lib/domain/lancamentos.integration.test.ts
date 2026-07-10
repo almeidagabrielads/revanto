@@ -73,6 +73,7 @@ describe("criarLancamento", () => {
       bancoId: banco.id,
       pessoaDivisaoId: gabi.id,
       pessoaPagouId: isa.id,
+      tipoGasto: "VARIAVEL",
     });
 
     expect(lancamento).not.toBeNull();
@@ -93,6 +94,7 @@ describe("criarLancamento", () => {
       bancoId: banco.id,
       pessoaDivisaoId: isa.id,
       pessoaPagouId: isa.id,
+      tipoGasto: "VARIAVEL",
     });
 
     expect(lancamento?.valorCentavos).toBe(-5000);
@@ -113,6 +115,7 @@ describe("criarLancamento", () => {
       bancoId: banco.id,
       pessoaDivisaoId: isa.id,
       pessoaPagouId: isa.id,
+      tipoGasto: "VARIAVEL",
     });
 
     expect(lancamento).toBeNull();
@@ -129,6 +132,7 @@ describe("criarLancamento", () => {
       bancoId: banco.id,
       pessoaDivisaoId: isa.id,
       pessoaPagouId: isa.id,
+      tipoGasto: "VARIAVEL",
     });
 
     expect(lancamento).toBeNull();
@@ -149,6 +153,7 @@ describe("criarLancamento", () => {
       bancoId: bancoDeOutraCasa.id,
       pessoaDivisaoId: isa.id,
       pessoaPagouId: isa.id,
+      tipoGasto: "VARIAVEL",
     });
 
     expect(lancamento).toBeNull();
@@ -164,6 +169,7 @@ describe("criarLancamento", () => {
       bancoId: banco.id,
       pessoaDivisaoId: isa.id,
       pessoaPagouId: isa.id,
+      tipoGasto: "VARIAVEL",
       pagoComResgateInvestimento: true,
     });
 
@@ -189,6 +195,7 @@ describe("criarLancamento", () => {
       bancoId: banco.id,
       pessoaDivisaoId: isa.id,
       pessoaPagouId: isa.id,
+      tipoGasto: "VARIAVEL",
       pagoComResgateInvestimento: true,
       investimentoResgateId: investimento.id,
     });
@@ -225,6 +232,7 @@ describe("criarLancamento", () => {
       bancoId: banco.id,
       pessoaDivisaoId: isa.id,
       pessoaPagouId: isa.id,
+      tipoGasto: "VARIAVEL",
       pagoComResgateInvestimento: true,
       investimentoResgateId: investimentoDeOutraCasa.id,
     });
@@ -245,6 +253,7 @@ describe("atualizarLancamento", () => {
       bancoId: banco.id,
       pessoaDivisaoId: isa.id,
       pessoaPagouId: isa.id,
+      tipoGasto: "VARIAVEL",
     });
 
     const atualizado = await atualizarLancamento(
@@ -272,6 +281,7 @@ describe("atualizarLancamento", () => {
       bancoId: banco.id,
       pessoaDivisaoId: isa.id,
       pessoaPagouId: isa.id,
+      tipoGasto: "VARIAVEL",
     });
 
     const atualizado = await atualizarLancamento(
@@ -309,6 +319,7 @@ describe("atualizarLancamento", () => {
       bancoId: banco.id,
       pessoaDivisaoId: isa.id,
       pessoaPagouId: isa.id,
+      tipoGasto: "VARIAVEL",
     });
 
     const marcado = await atualizarLancamento(
@@ -344,6 +355,7 @@ describe("removerLancamento", () => {
       bancoId: banco.id,
       pessoaDivisaoId: isa.id,
       pessoaPagouId: isa.id,
+      tipoGasto: "VARIAVEL",
     });
 
     const removido = await removerLancamento(prismaTest, h.id, lancamento!.id);
@@ -367,6 +379,7 @@ describe("buscarLancamento", () => {
       bancoId: banco.id,
       pessoaDivisaoId: isa.id,
       pessoaPagouId: isa.id,
+      tipoGasto: "VARIAVEL",
     });
 
     const resultado = await buscarLancamento(prismaTest, h2.id, lancamento!.id);
@@ -384,6 +397,7 @@ describe("listarLancamentos (filtros)", () => {
       bancoId: banco.id,
       pessoaDivisaoId: isa.id,
       pessoaPagouId: isa.id,
+      tipoGasto: "VARIAVEL",
     });
     await criarLancamento(prismaTest, h.id, {
       data: new Date("2026-06-15"),
@@ -391,6 +405,7 @@ describe("listarLancamentos (filtros)", () => {
       bancoId: banco.id,
       pessoaDivisaoId: isa.id,
       pessoaPagouId: isa.id,
+      tipoGasto: "VARIAVEL",
     });
 
     const lancamentos = await listarLancamentos(prismaTest, h.id, {
@@ -415,6 +430,7 @@ describe("listarLancamentos (filtros)", () => {
       bancoId: banco.id,
       pessoaDivisaoId: isa.id,
       pessoaPagouId: isa.id,
+      tipoGasto: "VARIAVEL",
     });
     await criarLancamento(prismaTest, h.id, {
       data: new Date("2026-06-02"),
@@ -423,6 +439,7 @@ describe("listarLancamentos (filtros)", () => {
       bancoId: banco.id,
       pessoaDivisaoId: isa.id,
       pessoaPagouId: isa.id,
+      tipoGasto: "VARIAVEL",
     });
 
     const lancamentos = await listarLancamentos(prismaTest, h.id, {
@@ -442,6 +459,7 @@ describe("listarLancamentos (filtros)", () => {
       bancoId: banco.id,
       pessoaDivisaoId: gabi.id,
       pessoaPagouId: isa.id,
+      tipoGasto: "VARIAVEL",
     });
     await criarLancamento(prismaTest, h.id, {
       data: new Date("2026-06-02"),
@@ -449,6 +467,7 @@ describe("listarLancamentos (filtros)", () => {
       bancoId: banco.id,
       pessoaDivisaoId: gabi.id,
       pessoaPagouId: gabi.id,
+      tipoGasto: "VARIAVEL",
     });
     await criarLancamento(prismaTest, h.id, {
       data: new Date("2026-06-03"),
@@ -456,6 +475,7 @@ describe("listarLancamentos (filtros)", () => {
       bancoId: banco.id,
       pessoaDivisaoId: isa.id,
       pessoaPagouId: isa.id,
+      tipoGasto: "VARIAVEL",
     });
 
     const lancamentos = await listarLancamentos(prismaTest, h.id, {
@@ -485,6 +505,7 @@ describe("listarLancamentos (filtros)", () => {
       bancoId: banco.id,
       pessoaDivisaoId: familia.id,
       pessoaPagouId: gabi.id,
+      tipoGasto: "VARIAVEL",
     });
     // Gasto individual da Gabi, sem relação com a Isa ou o grupo.
     await criarLancamento(prismaTest, h.id, {
@@ -493,6 +514,7 @@ describe("listarLancamentos (filtros)", () => {
       bancoId: banco.id,
       pessoaDivisaoId: gabi.id,
       pessoaPagouId: gabi.id,
+      tipoGasto: "VARIAVEL",
     });
 
     const lancamentos = await listarLancamentos(prismaTest, h.id, {
@@ -516,6 +538,7 @@ describe("listarLancamentos (filtros)", () => {
       bancoId: banco.id,
       pessoaDivisaoId: isa.id,
       pessoaPagouId: isa.id,
+      tipoGasto: "VARIAVEL",
     });
     await criarLancamento(prismaTest, h.id, {
       data: new Date("2026-06-02"),
@@ -523,6 +546,7 @@ describe("listarLancamentos (filtros)", () => {
       bancoId: outroBanco.id,
       pessoaDivisaoId: isa.id,
       pessoaPagouId: isa.id,
+      tipoGasto: "VARIAVEL",
     });
 
     const lancamentos = await listarLancamentos(prismaTest, h.id, {
@@ -543,6 +567,7 @@ describe("listarLancamentos (filtros)", () => {
       bancoId: banco.id,
       pessoaDivisaoId: isa.id,
       pessoaPagouId: isa.id,
+      tipoGasto: "VARIAVEL",
     });
 
     const lancamentos = await listarLancamentos(prismaTest, h2.id);

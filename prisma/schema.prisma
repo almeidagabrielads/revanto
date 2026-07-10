@@ -81,7 +81,8 @@ model Pessoa {
   investimentos               Investimento[]
   lancamentosDivisao          Lancamento[]         @relation("LancamentoDivisao")
   lancamentosPagou            Lancamento[]         @relation("LancamentoPagou")
-  orcamentos                  OrcamentoPlanejado[]
+  orcamentos                  OrcamentoPlanejado[] @relation("OrcamentoDono")
+  orcamentosDivisao           OrcamentoPlanejado[] @relation("OrcamentoDivisao")
   household                   Household            @relation(fields: [householdId], references: [id])
   posicoesPatrimonio          PosicaoPatrimonio[]
   receitas                    Receita[]
@@ -196,6 +197,7 @@ model Lancamento {
   hashImportacao             String?
   pagoComResgateInvestimento Boolean       @default(false)
   investimentoResgateId      String?
+  tipoGasto                  TipoGasto     @default(VARIAVEL)
   banco                      Banco         @relation(fields: [bancoId], references: [id])
   categoria                  Categoria?    @relation(fields: [categoriaId], references: [id])
   household                  Household     @relation(fields: [householdId], references: [id])
@@ -238,21 +240,28 @@ model Receita {
 model OrcamentoPlanejado {
   id             String        @id @default(cuid())
   pessoaId       String
+  // Com quem esse gasto planejado é dividido (Isa, Gabi, Família...) — igual
+  // ao pessoaDivisaoId do Lancamento, mas opcional e independente do
+  // pessoaId acima (que é sempre a Pessoa INDIVIDUAL dona do planejamento).
+  divisaoId      String?
   categoriaId    String
   subcategoriaId String?
   mes            Int?
   ano            Int
   valorCentavos  Int
+  tipoGasto      TipoGasto     @default(VARIAVEL)
   householdId    String
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
   categoria      Categoria     @relation(fields: [categoriaId], references: [id])
   household      Household     @relation(fields: [householdId], references: [id])
-  pessoa         Pessoa        @relation(fields: [pessoaId], references: [id])
+  pessoa         Pessoa        @relation("OrcamentoDono", fields: [pessoaId], references: [id])
+  divisao        Pessoa?       @relation("OrcamentoDivisao", fields: [divisaoId], references: [id])
   subcategoria   Subcategoria? @relation(fields: [subcategoriaId], references: [id])
 
   @@unique([householdId, pessoaId, categoriaId, subcategoriaId, mes, ano])
   @@index([householdId, ano, mes])
+  @@index([householdId, divisaoId])
 }
 
 model Investimento {
@@ -376,6 +385,12 @@ enum TipoBanco {
   CORRETORA
   DINHEIRO
   OUTRO
+}
+
+enum TipoGasto {
+  FIXO
+  VARIAVEL
+  INVESTIMENTO
 }
 
 enum PapelUsuario {

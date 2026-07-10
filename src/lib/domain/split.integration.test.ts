@@ -59,6 +59,7 @@ describe("buscarSaldoDivisaoGrupo", () => {
       bancoId: banco.id,
       pessoaDivisaoId: casal.id,
       pessoaPagouId: isa.id,
+      tipoGasto: "VARIAVEL",
       valorCentavos: 100_000,
     });
 
@@ -81,6 +82,7 @@ describe("buscarSaldoDivisaoGrupo", () => {
       bancoId: banco.id,
       pessoaDivisaoId: isa.id,
       pessoaPagouId: gabi.id,
+      tipoGasto: "VARIAVEL",
       valorCentavos: 10_000,
     });
     await criarLancamento(prismaTest, household.id, {
@@ -89,6 +91,7 @@ describe("buscarSaldoDivisaoGrupo", () => {
       bancoId: banco.id,
       pessoaDivisaoId: isa.id,
       pessoaPagouId: gabi.id,
+      tipoGasto: "VARIAVEL",
       valorCentavos: 20_000,
     });
 
@@ -155,6 +158,7 @@ describe("buscarSaldoDivisaoGrupo", () => {
       bancoId: banco.id,
       pessoaDivisaoId: casa.id,
       pessoaPagouId: ana.id,
+      tipoGasto: "VARIAVEL",
       valorCentavos: 90_000,
     });
 
@@ -182,6 +186,7 @@ describe("buscarSaldoDivisaoGrupo", () => {
       bancoId: banco.id,
       pessoaDivisaoId: isa.id,
       pessoaPagouId: isa.id,
+      tipoGasto: "VARIAVEL",
       valorCentavos: 300_00,
     });
     await criarLancamento(prismaTest, household.id, {
@@ -190,6 +195,7 @@ describe("buscarSaldoDivisaoGrupo", () => {
       bancoId: banco.id,
       pessoaDivisaoId: gabi.id,
       pessoaPagouId: gabi.id,
+      tipoGasto: "VARIAVEL",
       valorCentavos: 50_00,
     });
 
@@ -246,6 +252,7 @@ describe("buscarSaldoDivisaoGrupo", () => {
       bancoId: banco.id,
       pessoaDivisaoId: casal.id,
       pessoaPagouId: isa.id,
+      tipoGasto: "VARIAVEL",
       valorCentavos: 100_000,
     });
 
@@ -267,6 +274,7 @@ describe("buscarSaldoDivisaoGrupo", () => {
       bancoId: banco.id,
       pessoaDivisaoId: casal.id,
       pessoaPagouId: isa.id,
+      tipoGasto: "VARIAVEL",
       valorCentavos: 100_000,
     });
     // Bruto: Gabi deve 50.000 a Isa. Gabi já pagou 50.000 (acerto resolvido
@@ -308,6 +316,7 @@ describe("buscarSaldoDivisaoGrupo", () => {
       bancoId: banco.id,
       pessoaDivisaoId: casal.id,
       pessoaPagouId: isa.id,
+      tipoGasto: "VARIAVEL",
       valorCentavos: 100_000,
     });
     // Acerto resolvido em janeiro (mês sem lançamentos neste teste).
@@ -367,6 +376,7 @@ describe("buscarSaldoDivisaoGrupo", () => {
       bancoId: banco.id,
       pessoaDivisaoId: familia.id,
       pessoaPagouId: isa.id,
+      tipoGasto: "VARIAVEL",
       valorCentavos: 100_000,
     });
 

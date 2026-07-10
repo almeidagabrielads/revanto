@@ -78,6 +78,7 @@ describe("buscarRelatorioAnual", () => {
       mes: 1,
       ano: 2026,
       valorCentavos: 50_000,
+      tipoGasto: "VARIAVEL",
     });
     await criarOrcamento(prismaTest, household.id, {
       pessoaId: gabi.id,
@@ -86,6 +87,7 @@ describe("buscarRelatorioAnual", () => {
       mes: 1,
       ano: 2026,
       valorCentavos: 100_000,
+      tipoGasto: "VARIAVEL",
     });
 
     // Lançamentos: um em nome do casal (pago pela Isa) e outro individual da Isa.
@@ -96,6 +98,7 @@ describe("buscarRelatorioAnual", () => {
       bancoId: banco.id,
       pessoaDivisaoId: casal.id,
       pessoaPagouId: isa.id,
+      tipoGasto: "VARIAVEL",
       valorCentavos: 200_000,
     });
     await criarLancamento(prismaTest, household.id, {
@@ -105,6 +108,7 @@ describe("buscarRelatorioAnual", () => {
       bancoId: banco.id,
       pessoaDivisaoId: isa.id,
       pessoaPagouId: isa.id,
+      tipoGasto: "VARIAVEL",
       valorCentavos: 40_000,
     });
 
@@ -215,6 +219,7 @@ describe("buscarRelatorioAnual", () => {
       mes: 1,
       ano: 2026,
       valorCentavos: 50_000,
+      tipoGasto: "VARIAVEL",
     });
 
     const casal = await prismaTest.pessoa.findFirstOrThrow({
@@ -228,6 +233,7 @@ describe("buscarRelatorioAnual", () => {
       bancoId: banco.id,
       pessoaDivisaoId: casal.id,
       pessoaPagouId: isa.id,
+      tipoGasto: "VARIAVEL",
       valorCentavos: 200_000,
     });
     await criarLancamento(prismaTest, household.id, {
@@ -237,6 +243,7 @@ describe("buscarRelatorioAnual", () => {
       bancoId: banco.id,
       pessoaDivisaoId: isa.id,
       pessoaPagouId: isa.id,
+      tipoGasto: "VARIAVEL",
       valorCentavos: 40_000,
     });
 
@@ -278,6 +285,7 @@ describe("buscarRelatorioAnual", () => {
       bancoId: banco.id,
       pessoaDivisaoId: casal.id,
       pessoaPagouId: isa.id,
+      tipoGasto: "VARIAVEL",
       valorCentavos: 200_000,
     });
     await criarLancamento(prismaTest, household.id, {
@@ -287,6 +295,7 @@ describe("buscarRelatorioAnual", () => {
       bancoId: banco.id,
       pessoaDivisaoId: isa.id,
       pessoaPagouId: isa.id,
+      tipoGasto: "VARIAVEL",
       valorCentavos: 40_000,
     });
 
