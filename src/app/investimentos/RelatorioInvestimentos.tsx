@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ColumnHeader } from "../components/ColumnHeader";
 import { Select } from "../components/Select";
 import { useTabela, type ColunaTabela } from "../components/useTabela";
@@ -106,6 +106,7 @@ function corRampaLiquidez(indice: number): string {
 }
 type LinhaRendimento = {
   mes: string;
+  posicaoCentavos: number;
   rendimentoAcumuladoRealPercentual: number;
   cdiAcumuladoPercentual: number;
 };
@@ -248,58 +249,229 @@ function AlocacaoCard({
   );
 }
 
+// Escolhe um passo "redondo" (1/2/5 × potência de 10) para os ticks do eixo Y,
+// e devolve os limites já arredondados para esse passo.
+function calcularTicksEixoY(
+  min: number,
+  max: number,
+  quantidade = 5,
+): { ticks: number[]; min: number; max: number } {
+  if (min === max) {
+    return { ticks: [min], min: min - 1, max: max + 1 };
+  }
+  const passoBruto = (max - min) / (quantidade - 1);
+  const magnitude = Math.pow(10, Math.floor(Math.log10(passoBruto)));
+  const residual = passoBruto / magnitude;
+  const passoLimpo =
+    (residual > 5 ? 10 : residual > 2 ? 5 : residual > 1 ? 2 : 1) * magnitude;
+
+  const minLimpo = Math.floor(min / passoLimpo) * passoLimpo;
+  const maxLimpo = Math.ceil(max / passoLimpo) * passoLimpo;
+  const ticks: number[] = [];
+  for (let v = minLimpo; v <= maxLimpo + passoLimpo / 2; v += passoLimpo) {
+    ticks.push(Math.round(v * 100) / 100);
+  }
+  return { ticks, min: minLimpo, max: maxLimpo };
+}
+
 function GraficoRendimento({ linhas }: { linhas: LinhaRendimento[] }) {
   const largura = 640;
   const altura = 220;
-  const padding = 8;
+  const padTop = 12;
+  const padBottom = 12;
+  const padLeft = 52;
+  const padRight = 8;
+
+  const svgRef = useRef<SVGSVGElement>(null);
+  const [hoverIndex, setHoverIndex] = useState<number | null>(null);
 
   const valores = linhas.flatMap((l) => [
     l.rendimentoAcumuladoRealPercentual,
     l.cdiAcumuladoPercentual,
   ]);
-  const min = Math.min(0, ...valores);
-  const max = Math.max(0, ...valores, 0.01);
+  const {
+    ticks,
+    min,
+    max,
+  } = calcularTicksEixoY(Math.min(0, ...valores), Math.max(0, ...valores, 0.01));
 
-  function pontos(chave: keyof LinhaRendimento): string {
-    if (linhas.length === 1) {
-      const y =
-        altura -
-        padding -
-        (((linhas[0][chave] as number) - min) / (max - min)) *
-          (altura - 2 * padding);
-      return `${padding},${y} ${largura - padding},${y}`;
-    }
-    return linhas
-      .map((l, i) => {
-        const x = padding + (i / (linhas.length - 1)) * (largura - 2 * padding);
-        const y =
-          altura -
-          padding -
-          (((l[chave] as number) - min) / (max - min)) * (altura - 2 * padding);
-        return `${x},${y}`;
-      })
-      .join(" ");
+  function coordenadas(
+    chave: "rendimentoAcumuladoRealPercentual" | "cdiAcumuladoPercentual",
+    i: number,
+  ): { x: number; y: number } {
+    const x =
+      linhas.length === 1
+        ? padLeft
+        : padLeft + (i / (linhas.length - 1)) * (largura - padLeft - padRight);
+    const y =
+      altura -
+      padBottom -
+      ((linhas[i][chave] - min) / (max - min)) * (altura - padTop - padBottom);
+    return { x, y };
   }
 
+  function pontos(chave: "rendimentoAcumuladoRealPercentual" | "cdiAcumuladoPercentual"): string {
+    if (linhas.length === 1) {
+      const { y } = coordenadas(chave, 0);
+      return `${padLeft},${y} ${largura - padRight},${y}`;
+    }
+    return linhas.map((_, i) => `${coordenadas(chave, i).x},${coordenadas(chave, i).y}`).join(" ");
+  }
+
+  function yDoValor(valor: number): number {
+    return (
+      altura -
+      padBottom -
+      ((valor - min) / (max - min)) * (altura - padTop - padBottom)
+    );
+  }
+
+  function aoMoverMouse(e: React.MouseEvent<SVGSVGElement>) {
+    const svg = svgRef.current;
+    if (!svg || linhas.length === 0) return;
+    const rect = svg.getBoundingClientRect();
+    const svgX = ((e.clientX - rect.left) / rect.width) * largura;
+    const usableWidth = largura - padLeft - padRight;
+    const frac =
+      linhas.length === 1 ? 0 : (svgX - padLeft) / usableWidth;
+    const index = Math.min(
+      linhas.length - 1,
+      Math.max(0, Math.round(frac * (linhas.length - 1))),
+    );
+    setHoverIndex(index);
+  }
+
+  const linhaAtiva = hoverIndex !== null ? linhas[hoverIndex] : null;
+  const pontoCarteira =
+    hoverIndex !== null ? coordenadas("rendimentoAcumuladoRealPercentual", hoverIndex) : null;
+  const pontoCdi =
+    hoverIndex !== null ? coordenadas("cdiAcumuladoPercentual", hoverIndex) : null;
+
+  const tooltipLeftPct = pontoCarteira
+    ? Math.min(92, Math.max(8, (pontoCarteira.x / largura) * 100))
+    : 0;
+  const tooltipTopPct =
+    pontoCarteira && pontoCdi
+      ? Math.max(0, (Math.min(pontoCarteira.y, pontoCdi.y) / altura) * 100)
+      : 0;
+
   return (
-    <svg
-      viewBox={`0 0 ${largura} ${altura}`}
-      className="w-full"
-      preserveAspectRatio="none"
-    >
-      <polyline
-        points={pontos("cdiAcumuladoPercentual")}
-        fill="none"
-        stroke="var(--color-outline)"
-        strokeWidth={2}
-      />
-      <polyline
-        points={pontos("rendimentoAcumuladoRealPercentual")}
-        fill="none"
-        stroke="var(--color-primary)"
-        strokeWidth={3}
-      />
-    </svg>
+    <div className="relative w-full">
+      <svg
+        ref={svgRef}
+        viewBox={`0 0 ${largura} ${altura}`}
+        className="w-full"
+        preserveAspectRatio="none"
+        onMouseMove={aoMoverMouse}
+        onMouseLeave={() => setHoverIndex(null)}
+      >
+        {ticks.map((v) => (
+          <g key={v}>
+            <line
+              x1={padLeft}
+              x2={largura - padRight}
+              y1={yDoValor(v)}
+              y2={yDoValor(v)}
+              stroke={
+                v === 0
+                  ? "var(--color-outline)"
+                  : "var(--color-outline-variant)"
+              }
+              strokeWidth={v === 0 ? 1 : 0.5}
+            />
+            <text
+              x={padLeft - 6}
+              y={yDoValor(v)}
+              textAnchor="end"
+              dominantBaseline="middle"
+              fontSize={10}
+              fill="var(--color-on-surface-variant)"
+            >
+              {v.toFixed(1)}%
+            </text>
+          </g>
+        ))}
+
+        <polyline
+          points={pontos("cdiAcumuladoPercentual")}
+          fill="none"
+          stroke="var(--color-outline)"
+          strokeWidth={2}
+        />
+        <polyline
+          points={pontos("rendimentoAcumuladoRealPercentual")}
+          fill="none"
+          stroke="var(--color-primary)"
+          strokeWidth={3}
+        />
+
+        {hoverIndex !== null && pontoCarteira && pontoCdi && (
+          <g pointerEvents="none">
+            <line
+              x1={pontoCarteira.x}
+              x2={pontoCarteira.x}
+              y1={padTop}
+              y2={altura - padBottom}
+              stroke="var(--color-outline-variant)"
+              strokeWidth={1}
+            />
+            <circle
+              cx={pontoCdi.x}
+              cy={pontoCdi.y}
+              r={4}
+              fill="var(--color-surface-container-lowest)"
+              stroke="var(--color-outline)"
+              strokeWidth={2}
+            />
+            <circle
+              cx={pontoCarteira.x}
+              cy={pontoCarteira.y}
+              r={4}
+              fill="var(--color-surface-container-lowest)"
+              stroke="var(--color-primary)"
+              strokeWidth={2}
+            />
+          </g>
+        )}
+      </svg>
+
+      {linhaAtiva && (
+        <div
+          className="border-outline-variant bg-surface-container-highest p-sm pointer-events-none absolute z-10 flex -translate-x-1/2 -translate-y-[calc(100%+10px)] flex-col gap-1 rounded-lg border text-xs whitespace-nowrap shadow-md"
+          style={{ left: `${tooltipLeftPct}%`, top: `${tooltipTopPct}%` }}
+        >
+          <span className="text-on-surface font-semibold">
+            {(() => {
+              const texto = new Date(linhaAtiva.mes).toLocaleDateString(
+                "pt-BR",
+                { month: "long", year: "numeric", timeZone: "UTC" },
+              );
+              return texto.charAt(0).toUpperCase() + texto.slice(1);
+            })()}
+          </span>
+          <span className="text-on-surface-variant">
+            Patrimônio:{" "}
+            <span className="text-on-surface font-medium">
+              {formatarReais(linhaAtiva.posicaoCentavos)}
+            </span>
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="bg-primary h-2 w-2 rounded-full" />
+            <span className="text-on-surface-variant">Carteira:</span>
+            <span className="text-on-surface font-medium">
+              {linhaAtiva.rendimentoAcumuladoRealPercentual.toFixed(2)}%
+            </span>
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="bg-outline h-2 w-2 rounded-full" />
+            <span className="text-on-surface-variant">CDI:</span>
+            <span className="text-on-surface font-medium">
+              {linhaAtiva.cdiAcumuladoPercentual.toFixed(2)}%
+            </span>
+          </span>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -590,7 +762,10 @@ export function RelatorioInvestimentos({
           ) : rendimento.length > 0 ? (
             <>
               <GraficoRendimento linhas={rendimento} />
-              <div className="text-on-surface-variant flex justify-between text-xs">
+              <div
+                className="text-on-surface-variant flex justify-between text-xs"
+                style={{ paddingLeft: "8.125%", paddingRight: "1.25%" }}
+              >
                 {rendimento.map((l) => (
                   <span key={l.mes}>
                     {new Date(l.mes).toLocaleDateString("pt-BR", {
