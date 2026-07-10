@@ -42,7 +42,8 @@ type PlanejadoVsRealCategoria = {
 };
 
 type SecaoPlanejadoVsReal = {
-  pessoaId: string | null;
+  pessoaId: string;
+  tipo: string;
   label: string;
   itens: PlanejadoVsRealCategoria[];
 };
@@ -155,32 +156,25 @@ function somarItens(secoes: SecaoPlanejadoVsReal[]) {
     return atual;
   }
 
-  // Planejado: cada seção tem orçamentos de um dono diferente (pessoa
-  // individual ou compartilhado), então somar todas é correto.
-  for (const secao of secoes) {
+  // Quando há mais de uma seção (visão "Geral"), soma só as INDIVIDUAL: todo
+  // orçamento mora numa pessoa individual, e a fração de cada uma já fecha
+  // 100% do gasto real do household — somar as seções de grupo por cima
+  // duplicaria (o orçamento/gasto de um grupo já é a soma dos integrantes).
+  // Quando há uma única seção (visão filtrada por uma pessoa ou grupo
+  // específico), ela já é a resposta, seja indivíduo ou grupo.
+  const secoesConsolidadas =
+    secoes.length === 1
+      ? secoes
+      : secoes.filter((s) => s.tipo === "INDIVIDUAL");
+
+  for (const secao of secoesConsolidadas) {
     for (const item of secao.itens) {
       const atual = entrada(item);
       for (const mes of item.meses) {
         atual.meses[mes.mes - 1].planejadoCentavos += mes.planejadoCentavos;
-      }
-      atual.planejadoAnoCentavos += item.acumulado.planejadoCentavos;
-    }
-  }
-
-  // Real: a seção "Compartilhado" (pessoaId nulo) já reflete o total do
-  // household sem filtro (ver buscarPlanejadoVsReal), não só os gastos
-  // compartilhados — somar o real das seções individuais por cima duplicaria
-  // o valor (cada pessoa já inclui sua fração dos gastos de grupo). Quando
-  // não há seção "Compartilhado" (visão filtrada por uma única pessoa/
-  // grupo), essa seção única já é a fonte de verdade.
-  const secaoCompartilhada = secoes.find((s) => s.pessoaId === null);
-  const secoesReal = secaoCompartilhada ? [secaoCompartilhada] : secoes;
-  for (const secao of secoesReal) {
-    for (const item of secao.itens) {
-      const atual = entrada(item);
-      for (const mes of item.meses) {
         atual.meses[mes.mes - 1].realCentavos += mes.realCentavos;
       }
+      atual.planejadoAnoCentavos += item.acumulado.planejadoCentavos;
       atual.realAnoCentavos += item.acumulado.realCentavos;
     }
   }
@@ -384,15 +378,15 @@ export function DashboardAnual({ ano }: { ano: number }) {
     ...saldo.porMes.flatMap((m) => [m.receitaCentavos, m.despesaCentavos]),
   );
 
-  // "Compartilhado" (pessoaId nulo) não é um responsável — é o total do
-  // household sem filtro (ver buscarPlanejadoVsReal). Somando só as pessoas
-  // individuais já se chega a 100% do gasto real (cada uma inclui sua fração
-  // dos gastos de grupo), sem contar nada em dobro.
+  // Só pessoas INDIVIDUAL — somando as frações de cada uma já se chega a
+  // 100% do gasto real (cada uma inclui sua fração dos gastos de grupo), sem
+  // contar nada em dobro. Seções de grupo (CASAL/FAMILIA/OUTRO) ficam de fora
+  // daqui pelo mesmo motivo que ficam de fora de somarItens.
   const secoesComItens = relatorio.planejadoVsReal.filter(
-    (s) => s.pessoaId !== null && s.itens.length > 0,
+    (s) => s.tipo === "INDIVIDUAL" && s.itens.length > 0,
   );
   const totalPorSecao = secoesComItens.map((s) => ({
-    label: nomePessoa.get(s.pessoaId!),
+    label: nomePessoa.get(s.pessoaId),
     totalCentavos: s.itens.reduce(
       (soma, i) => soma + i.acumulado.realCentavos,
       0,

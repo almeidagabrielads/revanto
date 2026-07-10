@@ -18,15 +18,9 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const pessoaIdParam = params.get("pessoaId");
   const resultado = await buscarPlanejadoVsReal(prisma, session.householdId, {
     ano,
-    pessoaId:
-      pessoaIdParam === null
-        ? undefined
-        : pessoaIdParam === "null"
-          ? null
-          : pessoaIdParam,
+    pessoaId: params.get("pessoaId") ?? undefined,
   });
   return NextResponse.json(resultado);
 }

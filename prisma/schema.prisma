@@ -91,7 +91,7 @@ model Pessoa {
   @@unique([householdId, nome])
 }
 
-// Composição de um grupo (Pessoa tipo CASAL/FAMILIA): quais pessoas
+// Composição de um grupo (Pessoa tipo CASAL/FAMILIA/OUTRO): quais pessoas
 // INDIVIDUAL o formam e o peso relativo de cada uma na divisão dos gastos
 // atribuídos a esse grupo (ver src/lib/domain/split.ts).
 model IntegranteGrupo {
@@ -230,9 +230,14 @@ model Receita {
   @@index([householdId, mes])
 }
 
+// Orçamento é sempre de uma Pessoa INDIVIDUAL (ver validarReferencias em
+// src/lib/domain/orcamento.ts). O orçamento de um grupo (CASAL/FAMILIA/OUTRO)
+// não é armazenado — é calculado como a soma dos orçamentos de seus
+// integrantes (ver resolverPessoasEfetivas em pessoas.ts e
+// buscarPlanejadoVsReal em relatorios.ts).
 model OrcamentoPlanejado {
   id             String        @id @default(cuid())
-  pessoaId       String?
+  pessoaId       String
   categoriaId    String
   subcategoriaId String?
   mes            Int?
@@ -243,7 +248,7 @@ model OrcamentoPlanejado {
   updatedAt      DateTime      @updatedAt
   categoria      Categoria     @relation(fields: [categoriaId], references: [id])
   household      Household     @relation(fields: [householdId], references: [id])
-  pessoa         Pessoa?       @relation(fields: [pessoaId], references: [id])
+  pessoa         Pessoa        @relation(fields: [pessoaId], references: [id])
   subcategoria   Subcategoria? @relation(fields: [subcategoriaId], references: [id])
 
   @@unique([householdId, pessoaId, categoriaId, subcategoriaId, mes, ano])

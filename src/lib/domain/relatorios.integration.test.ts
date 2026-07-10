@@ -54,6 +54,7 @@ describe("buscarPlanejadoVsReal", () => {
       await montarBase();
 
     await criarOrcamento(prismaTest, household.id, {
+      pessoaId: isa.id,
       categoriaId: categoria.id,
       subcategoriaId: subcategoria.id,
       mes: 1,
@@ -101,13 +102,14 @@ describe("buscarPlanejadoVsReal", () => {
   });
 
   it("um valor definido em um mês específico sobrepõe o limite sugerido a partir daquele mês, mantendo o limite antes dele", async () => {
-    const { household, categoria } = await montarBase();
+    const { household, isa, categoria } = await montarBase();
     const subLimite = await criarSubcategoria(prismaTest, household.id, {
       nome: "Supermercado",
       categoriaId: categoria.id,
       orcamentoCentavos: 50_000,
     });
     await criarOrcamento(prismaTest, household.id, {
+      pessoaId: isa.id,
       categoriaId: categoria.id,
       subcategoriaId: subLimite!.id,
       mes: 6,
@@ -124,6 +126,47 @@ describe("buscarPlanejadoVsReal", () => {
     expect(linha.meses[4].planejadoCentavos).toBe(50_000); // mai: limite sugerido
     expect(linha.meses[5].planejadoCentavos).toBe(70_000); // jun: valor definido
     expect(linha.meses[11].planejadoCentavos).toBe(70_000); // dez: continua vigente
+  });
+
+  it("filtrando por um grupo (CASAL/FAMILIA/OUTRO), soma o orçamento de cada integrante INDIVIDUAL", async () => {
+    const { household, isa, categoria, subcategoria } = await montarBase();
+    const gabi = await criarPessoa(prismaTest, household.id, {
+      nome: "Gabi",
+      tipo: "INDIVIDUAL",
+    });
+    const casal = await criarPessoa(prismaTest, household.id, {
+      nome: "Casal",
+      tipo: "CASAL",
+    });
+    await definirIntegrantes(prismaTest, household.id, casal.id, [
+      { pessoaId: isa.id, peso: 100 },
+      { pessoaId: gabi.id, peso: 100 },
+    ]);
+
+    await criarOrcamento(prismaTest, household.id, {
+      pessoaId: isa.id,
+      categoriaId: categoria.id,
+      subcategoriaId: subcategoria.id,
+      mes: 1,
+      ano: 2026,
+      valorCentavos: 50_000,
+    });
+    await criarOrcamento(prismaTest, household.id, {
+      pessoaId: gabi.id,
+      categoriaId: categoria.id,
+      subcategoriaId: subcategoria.id,
+      mes: 1,
+      ano: 2026,
+      valorCentavos: 100_000,
+    });
+
+    const resultado = await buscarPlanejadoVsReal(prismaTest, household.id, {
+      ano: 2026,
+      pessoaId: casal.id,
+    });
+
+    const linha = resultado.find((r) => r.subcategoriaId === subcategoria.id)!;
+    expect(linha.meses[0].planejadoCentavos).toBe(150_000);
   });
 });
 

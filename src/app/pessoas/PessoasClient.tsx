@@ -14,7 +14,7 @@ const TIPOS_PESSOA = [
 
 type TipoPessoa = (typeof TIPOS_PESSOA)[number]["value"];
 
-const TIPOS_GRUPO = new Set<TipoPessoa>(["CASAL", "FAMILIA"]);
+const TIPOS_GRUPO = new Set<TipoPessoa>(["CASAL", "FAMILIA", "OUTRO"]);
 
 function labelTipo(tipo: string): string {
   return TIPOS_PESSOA.find((t) => t.value === tipo)?.label ?? tipo;

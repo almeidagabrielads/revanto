@@ -24,14 +24,8 @@ export async function GET(request: NextRequest) {
 
   const params = request.nextUrl.searchParams;
   const mesParam = params.get("mes");
-  const pessoaIdParam = params.get("pessoaId");
   const orcamentos = await listarOrcamentos(prisma, session.householdId, {
-    pessoaId:
-      pessoaIdParam === null
-        ? undefined
-        : pessoaIdParam === "null"
-          ? null
-          : pessoaIdParam,
+    pessoaId: params.get("pessoaId") ?? undefined,
     categoriaId: params.get("categoriaId") ?? undefined,
     subcategoriaId: params.get("subcategoriaId") ?? undefined,
     ano: parseInt10(params.get("ano")),

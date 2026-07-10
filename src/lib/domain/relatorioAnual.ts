@@ -52,8 +52,11 @@ export function calcularEvolucaoPatrimonio(
 }
 
 export type SecaoPlanejadoVsReal = {
-  // null = orçamento compartilhado pela casa (sem pessoa específica).
-  pessoaId: string | null;
+  pessoaId: string;
+  // Tipo da Pessoa (INDIVIDUAL, CASAL, FAMILIA, OUTRO) — usado pelo
+  // consumidor (DashboardAnual) para não somar duas vezes o gasto/orçamento
+  // de um grupo e de seus integrantes na visão "Geral".
+  tipo: string;
   label: string;
   itens: PlanejadoVsRealCategoria[];
 };
@@ -87,13 +90,14 @@ export async function buscarEvolucaoPatrimonioTotal(
   return calcularEvolucaoPatrimonio(posicoes);
 }
 
-// Sem pessoaId (visão "Geral"): uma seção por pessoa individual + uma
-// "Compartilhado" (orçamento da casa, pessoaId nulo) — como antes.
-// Com pessoaId (pessoa individual ou grupo CASAL/FAMILIA): uma única seção
-// com a visão daquele responsável, já com a mesma fração de gastos de grupo
-// usada em buscarSaldo/buscarResumoPorCategoria (ver resolverFracaoPorGrupo
-// em pessoas.ts) — filtrar por uma pessoa individual soma só a parte dela
-// dos gastos do grupo; filtrar por um grupo traz o valor cheio dele.
+// Sem pessoaId (visão "Geral"): uma seção por pessoa individual + uma por
+// grupo (CASAL/FAMILIA/OUTRO) — o orçamento do grupo é a soma do que cada
+// integrante planejou (ver buscarPlanejadoVsReal), não um valor à parte.
+// Com pessoaId (pessoa individual ou grupo): uma única seção com a visão
+// daquele responsável, já com a mesma fração de gastos de grupo usada em
+// buscarSaldo/buscarResumoPorCategoria (ver resolverFracaoPorGrupo em
+// pessoas.ts) — filtrar por uma pessoa individual soma só a parte dela dos
+// gastos do grupo; filtrar por um grupo traz o valor cheio dele.
 async function buscarSecoesPlanejadoVsReal(
   prisma: PrismaClient,
   householdId: string,
@@ -103,49 +107,44 @@ async function buscarSecoesPlanejadoVsReal(
     const [pessoa, itens] = await Promise.all([
       prisma.pessoa.findFirst({
         where: { id: opts.pessoaId, householdId },
-        select: { nome: true },
+        select: { nome: true, tipo: true },
       }),
       buscarPlanejadoVsReal(prisma, householdId, {
         ano: opts.ano,
         pessoaId: opts.pessoaId,
       }),
     ]);
-    return [{ pessoaId: opts.pessoaId, label: pessoa?.nome ?? "—", itens }];
+    return [
+      {
+        pessoaId: opts.pessoaId,
+        tipo: pessoa?.tipo ?? "INDIVIDUAL",
+        label: pessoa?.nome ?? "—",
+        itens,
+      },
+    ];
   }
 
-  const pessoasIndividuais = await prisma.pessoa.findMany({
-    where: { householdId, tipo: "INDIVIDUAL" },
+  const pessoas = await prisma.pessoa.findMany({
+    where: { householdId },
     orderBy: { nome: "asc" },
-    select: { id: true, nome: true },
+    select: { id: true, nome: true, tipo: true },
   });
 
-  const [planejadoVsRealFamilia, planejadoVsRealPorPessoa] = await Promise.all([
-    buscarPlanejadoVsReal(prisma, householdId, {
-      ano: opts.ano,
-      pessoaId: null,
-    }),
-    Promise.all(
-      pessoasIndividuais.map((pessoa) =>
-        buscarPlanejadoVsReal(prisma, householdId, {
-          ano: opts.ano,
-          pessoaId: pessoa.id,
-        }),
-      ),
+  const planejadoVsRealPorPessoa = await Promise.all(
+    pessoas.map((pessoa) =>
+      buscarPlanejadoVsReal(prisma, householdId, {
+        ano: opts.ano,
+        pessoaId: pessoa.id,
+      }),
     ),
-  ]);
+  );
 
-  return [
-    ...pessoasIndividuais.map((pessoa, i) => ({
-      pessoaId: pessoa.id,
-      label: pessoa.nome,
-      itens: planejadoVsRealPorPessoa[i],
-    })),
-    {
-      pessoaId: null,
-      label: "Compartilhado",
-      itens: planejadoVsRealFamilia,
-    },
-  ];
+  return pessoas.map((pessoa, i) => ({
+    pessoaId: pessoa.id,
+    tipo: pessoa.tipo,
+    label: pessoa.nome,
+    itens: planejadoVsRealPorPessoa[i],
+  }));
 }
 
 export async function buscarRelatorioAnual(

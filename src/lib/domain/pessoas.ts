@@ -8,9 +8,6 @@ export const TipoPessoaSchema = z.enum([
   "OUTRO",
 ]);
 
-// Tipos de Pessoa que podem ter integrantes (composição de grupo).
-const TIPOS_GRUPO = ["CASAL", "FAMILIA"] as const;
-
 export const CriarPessoaSchema = z.object({
   nome: z.string().trim().min(1, "Nome é obrigatório."),
   tipo: TipoPessoaSchema,
@@ -67,8 +64,9 @@ export async function atualizarPessoa(
   if (!existente) return null;
 
   // Mudar o tipo pode invalidar composições de grupo já cadastradas: uma
-  // pessoa que deixa de ser CASAL/FAMILIA não pode mais ter integrantes; uma
-  // pessoa que deixa de ser INDIVIDUAL não pode mais integrar outros grupos.
+  // pessoa que deixa de ser um grupo (tipo não-INDIVIDUAL) não pode mais ter
+  // integrantes; uma pessoa que deixa de ser INDIVIDUAL não pode mais
+  // integrar outros grupos.
   const tipoVirouIndividual =
     input.tipo === "INDIVIDUAL" && existente.tipo !== "INDIVIDUAL";
   const tipoDeixouDeSerIndividual =
@@ -110,10 +108,10 @@ export function listarIntegrantes(
 }
 
 /**
- * Substitui por completo a composição de um grupo (CASAL/FAMILIA). Retorna
- * `null` se o grupo não existir, não for do tipo CASAL/FAMILIA, se algum
- * `pessoaId` não for uma pessoa INDIVIDUAL do mesmo household, ou se houver
- * `pessoaId` duplicado na lista.
+ * Substitui por completo a composição de um grupo (qualquer Pessoa que não
+ * seja INDIVIDUAL — CASAL, FAMILIA ou OUTRO). Retorna `null` se o grupo não
+ * existir, for do tipo INDIVIDUAL, se algum `pessoaId` não for uma pessoa
+ * INDIVIDUAL do mesmo household, ou se houver `pessoaId` duplicado na lista.
  */
 export async function definirIntegrantes(
   prisma: PrismaClient,
@@ -124,7 +122,7 @@ export async function definirIntegrantes(
   const grupo = await prisma.pessoa.findFirst({
     where: { id: grupoId, householdId },
   });
-  if (!grupo || !(TIPOS_GRUPO as readonly string[]).includes(grupo.tipo)) {
+  if (!grupo || grupo.tipo === "INDIVIDUAL") {
     return null;
   }
 
@@ -161,7 +159,7 @@ export async function definirIntegrantes(
 /**
  * Resolve uma referência de Pessoa para o conjunto de pessoas INDIVIDUAL por
  * trás dela: ela mesma, se já for INDIVIDUAL (ou não for encontrada); ou ela
- * e todos os seus integrantes, se for um grupo (CASAL/FAMILIA). Usado para
+ * e todos os seus integrantes, se for um grupo (CASAL/FAMILIA/OUTRO). Usado para
  * agregar métricas (ex.: renda) de um grupo a partir de seus integrantes.
  */
 export async function resolverPessoasEfetivas(
@@ -179,7 +177,7 @@ export async function resolverPessoasEfetivas(
 
 /**
  * Para uma pessoa INDIVIDUAL, retorna a fração (0–1) que ela representa em
- * cada grupo (CASAL/FAMILIA) do qual participa — peso dela sobre a soma dos
+ * cada grupo (CASAL/FAMILIA/OUTRO) do qual participa — peso dela sobre a soma dos
  * pesos do grupo. Usado para atribuir a cada pessoa sua parte proporcional de
  * um gasto lançado no grupo (ex.: "Gastos totais" de alguém = seus gastos
  * diretos + a fração que lhe cabe dos gastos do grupo), o mesmo peso usado no

@@ -272,12 +272,34 @@ describe("Receita", () => {
 // ─── OrçamentoPlanejado ────────────────────────────────────────────────────────
 
 describe("OrcamentoPlanejado", () => {
-  it("cria orçamento do casal (pessoaId null)", async () => {
+  it("exige pessoaId (não aceita mais orçamento sem pessoa)", async () => {
     const h = await criarHousehold();
+    const cat = await criarCategoria(h.id);
+    await expect(
+      prismaTest.orcamentoPlanejado.create({
+        data: {
+          categoriaId: cat.id,
+          mes: 1,
+          ano: 2025,
+          valorCentavos: 200000,
+          householdId: h.id,
+          // pessoaId omitido de propósito: o teste verifica que o banco
+          // rejeita (coluna NOT NULL) — cast necessário pois o tipo do
+          // Prisma Client já exige pessoaId.
+        } as unknown as Parameters<
+          typeof prismaTest.orcamentoPlanejado.create
+        >[0]["data"],
+      }),
+    ).rejects.toThrow();
+  });
+
+  it("cria orçamento vinculado a uma pessoa INDIVIDUAL", async () => {
+    const h = await criarHousehold();
+    const gabi = await criarPessoa(h.id, "Gabi");
     const cat = await criarCategoria(h.id);
     const orc = await prismaTest.orcamentoPlanejado.create({
       data: {
-        pessoaId: null,
+        pessoaId: gabi.id,
         categoriaId: cat.id,
         mes: 1,
         ano: 2025,
@@ -285,7 +307,7 @@ describe("OrcamentoPlanejado", () => {
         householdId: h.id,
       },
     });
-    expect(orc.pessoaId).toBeNull();
+    expect(orc.pessoaId).toBe(gabi.id);
   });
 
   it("rejeita orçamento duplicado para mesma pessoa/categoria/mês/ano", async () => {

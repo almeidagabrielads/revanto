@@ -167,14 +167,23 @@ export function calcularPlanejadoVsReal(
 export async function buscarPlanejadoVsReal(
   prisma: PrismaClient,
   householdId: string,
-  opts: { ano: number; pessoaId?: string | null },
+  opts: { ano: number; pessoaId?: string },
 ): Promise<PlanejadoVsRealCategoria[]> {
+  // Filtrar por uma pessoa INDIVIDUAL traz só o orçamento dela; filtrar por um
+  // grupo (CASAL/FAMILIA/OUTRO) expande para os integrantes (o orçamento do
+  // grupo não é armazenado — é a soma do que cada integrante planejou, já
+  // somada abaixo por calcularPlanejadoVsReal quando há mais de uma entrada
+  // na mesma posição categoria/subcategoria/mês).
+  const pessoaIds = opts.pessoaId
+    ? await resolverPessoasEfetivas(prisma, householdId, opts.pessoaId)
+    : undefined;
+
   const [orcamentos, lancamentos, subcategorias] = await Promise.all([
     prisma.orcamentoPlanejado.findMany({
       where: {
         householdId,
         ano: opts.ano,
-        ...(opts.pessoaId !== undefined ? { pessoaId: opts.pessoaId } : {}),
+        ...(pessoaIds ? { pessoaId: { in: pessoaIds } } : {}),
       },
       select: {
         categoriaId: true,

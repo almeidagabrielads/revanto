@@ -33,7 +33,7 @@ export async function PUT(
     return NextResponse.json(
       {
         error:
-          "Grupo inválido ou integrante inválido (verifique se o grupo é CASAL/FAMILIA e se cada pessoa é INDIVIDUAL do mesmo household, sem repetição).",
+          "Grupo inválido ou integrante inválido (verifique se o grupo não é do tipo INDIVIDUAL e se cada pessoa é INDIVIDUAL do mesmo household, sem repetição).",
       },
       { status: 400 },
     );

@@ -62,17 +62,21 @@ describe("criarOrcamento", () => {
     expect(orcamento?.ano).toBe(2026);
   });
 
-  it("cria orçamento anual do household quando pessoaId não é informado", async () => {
+  it("retorna null se pessoaId é de um grupo (CASAL/FAMILIA/OUTRO), não de uma pessoa INDIVIDUAL", async () => {
     const { household, categoria } = await montarBase();
+    const casal = await criarPessoa(prismaTest, household.id, {
+      nome: "Casal",
+      tipo: "CASAL",
+    });
 
     const orcamento = await criarOrcamento(prismaTest, household.id, {
+      pessoaId: casal.id,
       categoriaId: categoria.id,
       ano: 2026,
       valorCentavos: 1200000,
     });
 
-    expect(orcamento?.pessoaId).toBeNull();
-    expect(orcamento?.mes).toBeNull();
+    expect(orcamento).toBeNull();
   });
 
   it("retorna null se pessoa pertence a outro household", async () => {
@@ -96,11 +100,16 @@ describe("criarOrcamento", () => {
   it("retorna null se categoria pertence a outro household", async () => {
     const h1 = await criarHousehold("Casa A");
     const h2 = await criarHousehold("Casa B");
+    const isa = await criarPessoa(prismaTest, h2.id, {
+      nome: "Isa",
+      tipo: "INDIVIDUAL",
+    });
     const categoriaDeOutraCasa = await criarCategoria(prismaTest, h1.id, {
       nome: "Moradia",
     });
 
     const orcamento = await criarOrcamento(prismaTest, h2.id, {
+      pessoaId: isa.id,
       categoriaId: categoriaDeOutraCasa.id,
       ano: 2026,
       valorCentavos: 1000,
@@ -110,7 +119,7 @@ describe("criarOrcamento", () => {
   });
 
   it("retorna null se subcategoria não pertence à categoria informada", async () => {
-    const { household, categoria } = await montarBase();
+    const { household, isa, categoria } = await montarBase();
     const outraCategoria = await criarCategoria(prismaTest, household.id, {
       nome: "Transporte",
     });
@@ -124,6 +133,7 @@ describe("criarOrcamento", () => {
     );
 
     const orcamento = await criarOrcamento(prismaTest, household.id, {
+      pessoaId: isa.id,
       categoriaId: categoria.id,
       subcategoriaId: subOutraCategoria!.id,
       ano: 2026,
@@ -136,8 +146,9 @@ describe("criarOrcamento", () => {
 
 describe("atualizarOrcamento", () => {
   it("atualiza valor e mês", async () => {
-    const { household, categoria } = await montarBase();
+    const { household, isa, categoria } = await montarBase();
     const orcamento = await criarOrcamento(prismaTest, household.id, {
+      pessoaId: isa.id,
       categoriaId: categoria.id,
       mes: 1,
       ano: 2026,
@@ -169,8 +180,9 @@ describe("atualizarOrcamento", () => {
 
 describe("removerOrcamento", () => {
   it("remove fisicamente o orçamento", async () => {
-    const { household, categoria } = await montarBase();
+    const { household, isa, categoria } = await montarBase();
     const orcamento = await criarOrcamento(prismaTest, household.id, {
+      pessoaId: isa.id,
       categoriaId: categoria.id,
       ano: 2026,
       valorCentavos: 100000,
@@ -192,9 +204,10 @@ describe("removerOrcamento", () => {
 
 describe("buscarOrcamento", () => {
   it("não retorna orçamento de outro household", async () => {
-    const { household, categoria } = await montarBase("Casa A");
+    const { household, isa, categoria } = await montarBase("Casa A");
     const h2 = await criarHousehold("Casa B");
     const orcamento = await criarOrcamento(prismaTest, household.id, {
+      pessoaId: isa.id,
       categoriaId: categoria.id,
       ano: 2026,
       valorCentavos: 1000,
@@ -233,43 +246,24 @@ describe("listarOrcamentos (filtros)", () => {
     expect(orcamentos[0].pessoaId).toBe(isa.id);
   });
 
-  it("filtra por household (orçamento sem pessoa) usando pessoaId null", async () => {
+  it("filtra por ano e mês", async () => {
     const { household, isa, categoria } = await montarBase();
     await criarOrcamento(prismaTest, household.id, {
       pessoaId: isa.id,
-      categoriaId: categoria.id,
-      ano: 2026,
-      valorCentavos: 100000,
-    });
-    await criarOrcamento(prismaTest, household.id, {
-      categoriaId: categoria.id,
-      ano: 2026,
-      valorCentavos: 500000,
-    });
-
-    const orcamentos = await listarOrcamentos(prismaTest, household.id, {
-      pessoaId: null,
-    });
-
-    expect(orcamentos).toHaveLength(1);
-    expect(orcamentos[0].pessoaId).toBeNull();
-  });
-
-  it("filtra por ano e mês", async () => {
-    const { household, categoria } = await montarBase();
-    await criarOrcamento(prismaTest, household.id, {
       categoriaId: categoria.id,
       mes: 1,
       ano: 2026,
       valorCentavos: 100000,
     });
     await criarOrcamento(prismaTest, household.id, {
+      pessoaId: isa.id,
       categoriaId: categoria.id,
       mes: 2,
       ano: 2026,
       valorCentavos: 200000,
     });
     await criarOrcamento(prismaTest, household.id, {
+      pessoaId: isa.id,
       categoriaId: categoria.id,
       mes: 1,
       ano: 2025,

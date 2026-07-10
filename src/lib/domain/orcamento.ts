@@ -2,8 +2,10 @@ import * as z from "zod";
 import type { PrismaClient } from "@/generated/prisma/client";
 
 export const CriarOrcamentoSchema = z.object({
-  // null/ausente = orçamento compartilhado da casa (não de uma pessoa específica)
-  pessoaId: z.string().trim().min(1).nullish(),
+  // Sempre uma Pessoa INDIVIDUAL (ver validarReferencias). O orçamento de um
+  // grupo (CASAL/FAMILIA/OUTRO) não é armazenado — é a soma dos orçamentos
+  // dos seus integrantes, calculada em src/lib/domain/relatorios.ts.
+  pessoaId: z.string().trim().min(1, "Pessoa é obrigatória."),
   categoriaId: z.string().trim().min(1, "Categoria é obrigatória."),
   subcategoriaId: z.string().trim().min(1).nullish(),
   // Valor vigente a partir desse mês, até o próximo mês com valor próprio.
@@ -26,7 +28,7 @@ export function listarOrcamentos(
   prisma: PrismaClient,
   householdId: string,
   opts: {
-    pessoaId?: string | null;
+    pessoaId?: string;
     categoriaId?: string;
     subcategoriaId?: string;
     ano?: number;
@@ -67,7 +69,7 @@ async function validarReferencias(
     const pessoa = await prisma.pessoa.findFirst({
       where: { id: input.pessoaId, householdId },
     });
-    if (!pessoa) return false;
+    if (!pessoa || pessoa.tipo !== "INDIVIDUAL") return false;
   }
 
   if (input.categoriaId) {
@@ -104,7 +106,7 @@ export async function criarOrcamento(
       categoriaId: input.categoriaId,
       valorCentavos: input.valorCentavos,
       ano: input.ano,
-      pessoaId: input.pessoaId ?? null,
+      pessoaId: input.pessoaId,
       subcategoriaId: input.subcategoriaId ?? null,
       mes: input.mes ?? null,
       householdId,

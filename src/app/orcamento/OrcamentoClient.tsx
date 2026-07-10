@@ -76,8 +76,8 @@ type PlanejadoVsRealCategoria = {
   acumulado: IndicadorPlanejado;
 };
 
-// "" = todas as pessoas/grupos; "null" = orçamento do casal/família (sem pessoa)
-const GRUPO_FAMILIA = "null";
+// "" = Total (casa toda): soma de todas as pessoas INDIVIDUAL, somente leitura.
+const TOTAL_CASA = "";
 
 type Aba = "mes" | "anual";
 
@@ -140,7 +140,7 @@ export function OrcamentoClient() {
   const [aba, setAba] = useState<Aba>("mes");
   const [ano, setAno] = useState(anoAtual);
   const [mes, setMes] = useState(mesAtual);
-  const [pessoaFiltro, setPessoaFiltro] = useState<string>(GRUPO_FAMILIA);
+  const [pessoaFiltro, setPessoaFiltro] = useState<string>(TOTAL_CASA);
   const [categorias, setCategorias] = useState<Categoria[] | null>(null);
   const [pessoas, setPessoas] = useState<Pessoa[]>([]);
   const [erro, setErro] = useState<string | null>(null);
@@ -178,6 +178,10 @@ export function OrcamentoClient() {
       </p>
     );
   }
+
+  const pessoaSelecionada = pessoas.find((p) => p.id === pessoaFiltro);
+  const editavel =
+    pessoaFiltro !== TOTAL_CASA && pessoaSelecionada?.tipo === "INDIVIDUAL";
 
   const abaClass = (ativo: boolean) =>
     `px-md py-sm text-sm font-semibold border-b-2 transition-colors ${
@@ -301,6 +305,7 @@ export function OrcamentoClient() {
           ano={ano}
           mes={mes}
           pessoaFiltro={pessoaFiltro}
+          editavel={!!editavel}
           categorias={categorias}
           setErro={setErro}
         />
@@ -309,6 +314,7 @@ export function OrcamentoClient() {
         <VisaoAnual
           ano={ano}
           pessoaFiltro={pessoaFiltro}
+          editavel={!!editavel}
           categorias={categorias}
           setErro={setErro}
         />
@@ -374,12 +380,14 @@ function VisaoMesAtual({
   ano,
   mes,
   pessoaFiltro,
+  editavel,
   categorias,
   setErro,
 }: {
   ano: number;
   mes: number;
   pessoaFiltro: string;
+  editavel: boolean;
   categorias: Categoria[] | null;
   setErro: (msg: string | null) => void;
 }) {
@@ -502,7 +510,7 @@ function VisaoMesAtual({
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        pessoaId: pessoaFiltro === GRUPO_FAMILIA ? null : pessoaFiltro || null,
+        pessoaId: pessoaFiltro,
         categoriaId,
         subcategoriaId,
         mes,
@@ -770,17 +778,21 @@ function VisaoMesAtual({
                           key={sub.id}
                           label={sub.nome}
                           indicador={indSub}
-                          planejadoEditavel={{
-                            valorCentavos: valorExibidoCentavos,
-                            itemId: itemRaw?.id,
-                            onSalvar: (texto) =>
-                              salvarPlanejadoSubcategoria(
-                                categoria.id,
-                                sub.id,
-                                texto,
-                                valorExibidoCentavos,
-                              ),
-                          }}
+                          planejadoEditavel={
+                            editavel
+                              ? {
+                                  valorCentavos: valorExibidoCentavos,
+                                  itemId: itemRaw?.id,
+                                  onSalvar: (texto) =>
+                                    salvarPlanejadoSubcategoria(
+                                      categoria.id,
+                                      sub.id,
+                                      texto,
+                                      valorExibidoCentavos,
+                                    ),
+                                }
+                              : undefined
+                          }
                         />
                       );
                     })}
@@ -998,11 +1010,13 @@ function LinhaMes({
 function VisaoAnual({
   ano,
   pessoaFiltro,
+  editavel,
   categorias,
   setErro,
 }: {
   ano: number;
   pessoaFiltro: string;
+  editavel: boolean;
   categorias: Categoria[] | null;
   setErro: (msg: string | null) => void;
 }) {
@@ -1160,7 +1174,7 @@ function VisaoAnual({
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        pessoaId: pessoaFiltro === GRUPO_FAMILIA ? null : pessoaFiltro || null,
+        pessoaId: pessoaFiltro,
         categoriaId,
         subcategoriaId,
         mes,
@@ -1208,6 +1222,7 @@ function VisaoAnual({
                   valorVigenteMes={valorVigenteMes}
                   totalAnual={totalAnualCategoria(categoria)}
                   onSalvar={salvarCelula}
+                  editavel={editavel}
                   destaque
                 />
                 {categoria.subcategorias.map((sub) => (
@@ -1220,6 +1235,7 @@ function VisaoAnual({
                     valorVigenteMes={valorVigenteMes}
                     totalAnual={totalAnualSubcategoria(categoria.id, sub.id)}
                     onSalvar={salvarCelula}
+                    editavel={editavel}
                   />
                 ))}
               </Fragment>
@@ -1246,6 +1262,7 @@ function LinhaOrcamento({
   valorVigenteMes,
   totalAnual,
   onSalvar,
+  editavel,
   destaque = false,
 }: {
   label: string;
@@ -1265,6 +1282,7 @@ function LinhaOrcamento({
     valorTexto: string,
     valorVigenteAntes: number,
   ) => Promise<void>;
+  editavel: boolean;
   destaque?: boolean;
 }) {
   return (
@@ -1291,28 +1309,34 @@ function LinhaOrcamento({
           ? item.valorCentavos
           : valorVigenteMes(categoriaId, subcategoriaId, mes);
         return (
-          <td key={mes} className="p-1">
-            <input
-              type="number"
-              step="0.01"
-              defaultValue={
-                valorVigente > 0 || item ? (valorVigente / 100).toFixed(2) : ""
-              }
-              key={
-                item?.id ??
-                `${chave(categoriaId, subcategoriaId, mes)}-${valorVigente}`
-              }
-              className="border-outline-variant bg-surface-container-lowest w-24 rounded-lg border px-1.5 py-1 text-right"
-              onBlur={(e) =>
-                onSalvar(
-                  categoriaId,
-                  subcategoriaId,
-                  mes,
-                  e.target.value,
-                  valorVigente,
-                )
-              }
-            />
+          <td key={mes} className={editavel ? "p-1" : "data-tabular p-2 text-right"}>
+            {editavel ? (
+              <input
+                type="number"
+                step="0.01"
+                defaultValue={
+                  valorVigente > 0 || item
+                    ? (valorVigente / 100).toFixed(2)
+                    : ""
+                }
+                key={
+                  item?.id ??
+                  `${chave(categoriaId, subcategoriaId, mes)}-${valorVigente}`
+                }
+                className="border-outline-variant bg-surface-container-lowest w-24 rounded-lg border px-1.5 py-1 text-right"
+                onBlur={(e) =>
+                  onSalvar(
+                    categoriaId,
+                    subcategoriaId,
+                    mes,
+                    e.target.value,
+                    valorVigente,
+                  )
+                }
+              />
+            ) : (
+              centavosParaReais(valorVigente)
+            )}
           </td>
         );
       })}

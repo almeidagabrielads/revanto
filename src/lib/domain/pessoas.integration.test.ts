@@ -229,6 +229,27 @@ describe("definirIntegrantes", () => {
     expect(resultado).toBeNull();
   });
 
+  it("aceita grupo tipo OUTRO (ex.: república) com múltiplos integrantes", async () => {
+    const { h, isa, gabi } = await montarGrupo();
+    const republica = await criarPessoa(prismaTest, h.id, {
+      nome: "República",
+      tipo: "OUTRO",
+    });
+
+    const resultado = await definirIntegrantes(prismaTest, h.id, republica.id, [
+      { pessoaId: isa.id, peso: 50 },
+      { pessoaId: gabi.id, peso: 50 },
+    ]);
+
+    expect(resultado).toHaveLength(2);
+    expect(resultado).toEqual(
+      expect.arrayContaining([
+        { pessoaId: isa.id, peso: 50 },
+        { pessoaId: gabi.id, peso: 50 },
+      ]),
+    );
+  });
+
   it("rejeita pessoaId duplicado na lista", async () => {
     const { h, isa, familia } = await montarGrupo();
 

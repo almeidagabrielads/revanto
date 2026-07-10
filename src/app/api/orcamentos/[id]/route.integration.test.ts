@@ -21,6 +21,12 @@ async function criarHouseholdComSessao() {
   return { household, cookie: `${SESSION_COOKIE}=${token}` };
 }
 
+async function criarPessoaIndividual(householdId: string, nome = "Isa") {
+  return prismaTest.pessoa.create({
+    data: { nome, tipo: "INDIVIDUAL", householdId },
+  });
+}
+
 function ctx(id: string) {
   return { params: Promise.resolve({ id }) };
 }
@@ -60,11 +66,13 @@ describe("GET /api/orcamentos/[id]", () => {
     const outraHousehold = await prismaTest.household.create({
       data: { nome: "Outra casa" },
     });
+    const isa = await criarPessoaIndividual(outraHousehold.id);
     const categoria = await prismaTest.categoria.create({
       data: { nome: "Moradia", householdId: outraHousehold.id },
     });
     const orcamento = await prismaTest.orcamentoPlanejado.create({
       data: {
+        pessoaId: isa.id,
         categoriaId: categoria.id,
         ano: 2026,
         valorCentavos: 500000,
@@ -78,11 +86,13 @@ describe("GET /api/orcamentos/[id]", () => {
 
   it("retorna o orçamento do household correto", async () => {
     const { household, cookie } = await criarHouseholdComSessao();
+    const isa = await criarPessoaIndividual(household.id);
     const categoria = await prismaTest.categoria.create({
       data: { nome: "Moradia", householdId: household.id },
     });
     const orcamento = await prismaTest.orcamentoPlanejado.create({
       data: {
+        pessoaId: isa.id,
         categoriaId: categoria.id,
         ano: 2026,
         valorCentavos: 500000,
@@ -101,11 +111,13 @@ describe("GET /api/orcamentos/[id]", () => {
 describe("PATCH /api/orcamentos/[id]", () => {
   it("atualiza valor e mês", async () => {
     const { household, cookie } = await criarHouseholdComSessao();
+    const isa = await criarPessoaIndividual(household.id);
     const categoria = await prismaTest.categoria.create({
       data: { nome: "Moradia", householdId: household.id },
     });
     const orcamento = await prismaTest.orcamentoPlanejado.create({
       data: {
+        pessoaId: isa.id,
         categoriaId: categoria.id,
         ano: 2026,
         valorCentavos: 500000,
@@ -129,11 +141,13 @@ describe("PATCH /api/orcamentos/[id]", () => {
     const outraHousehold = await prismaTest.household.create({
       data: { nome: "Outra casa" },
     });
+    const isa = await criarPessoaIndividual(outraHousehold.id);
     const categoria = await prismaTest.categoria.create({
       data: { nome: "Moradia", householdId: outraHousehold.id },
     });
     const orcamento = await prismaTest.orcamentoPlanejado.create({
       data: {
+        pessoaId: isa.id,
         categoriaId: categoria.id,
         ano: 2026,
         valorCentavos: 500000,
@@ -150,11 +164,13 @@ describe("PATCH /api/orcamentos/[id]", () => {
 
   it("retorna 400 para payload inválido", async () => {
     const { household, cookie } = await criarHouseholdComSessao();
+    const isa = await criarPessoaIndividual(household.id);
     const categoria = await prismaTest.categoria.create({
       data: { nome: "Moradia", householdId: household.id },
     });
     const orcamento = await prismaTest.orcamentoPlanejado.create({
       data: {
+        pessoaId: isa.id,
         categoriaId: categoria.id,
         ano: 2026,
         valorCentavos: 500000,
@@ -173,11 +189,13 @@ describe("PATCH /api/orcamentos/[id]", () => {
 describe("DELETE /api/orcamentos/[id]", () => {
   it("remove orçamento existente", async () => {
     const { household, cookie } = await criarHouseholdComSessao();
+    const isa = await criarPessoaIndividual(household.id);
     const categoria = await prismaTest.categoria.create({
       data: { nome: "Moradia", householdId: household.id },
     });
     const orcamento = await prismaTest.orcamentoPlanejado.create({
       data: {
+        pessoaId: isa.id,
         categoriaId: categoria.id,
         ano: 2026,
         valorCentavos: 500000,
@@ -199,11 +217,13 @@ describe("DELETE /api/orcamentos/[id]", () => {
     const outraHousehold = await prismaTest.household.create({
       data: { nome: "Outra casa" },
     });
+    const isa = await criarPessoaIndividual(outraHousehold.id);
     const categoria = await prismaTest.categoria.create({
       data: { nome: "Moradia", householdId: outraHousehold.id },
     });
     const orcamento = await prismaTest.orcamentoPlanejado.create({
       data: {
+        pessoaId: isa.id,
         categoriaId: categoria.id,
         ano: 2026,
         valorCentavos: 500000,

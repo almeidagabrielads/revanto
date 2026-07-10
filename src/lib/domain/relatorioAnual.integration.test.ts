@@ -69,14 +69,8 @@ describe("buscarRelatorioAnual", () => {
     const { household, isa, gabi, casal, categoria, subcategoria, banco } =
       await montarBase();
 
-    // Orçamento: um do casal/família e um específico da Isa.
-    await criarOrcamento(prismaTest, household.id, {
-      categoriaId: categoria.id,
-      subcategoriaId: subcategoria.id,
-      mes: 1,
-      ano: 2026,
-      valorCentavos: 150_000,
-    });
+    // Orçamento: cada uma planeja o seu — juntos, o casal planejou 150_000
+    // (o orçamento do casal não é armazenado, é a soma dos dois).
     await criarOrcamento(prismaTest, household.id, {
       pessoaId: isa.id,
       categoriaId: categoria.id,
@@ -84,6 +78,14 @@ describe("buscarRelatorioAnual", () => {
       mes: 1,
       ano: 2026,
       valorCentavos: 50_000,
+    });
+    await criarOrcamento(prismaTest, household.id, {
+      pessoaId: gabi.id,
+      categoriaId: categoria.id,
+      subcategoriaId: subcategoria.id,
+      mes: 1,
+      ano: 2026,
+      valorCentavos: 100_000,
     });
 
     // Lançamentos: um em nome do casal (pago pela Isa) e outro individual da Isa.
@@ -143,20 +145,21 @@ describe("buscarRelatorioAnual", () => {
     expect(relatorio.saldo.despesaCentavos).toBe(240_000);
     expect(relatorio.saldo.saldoCentavos).toBe(260_000);
 
-    // Planejado vs. real: uma seção por pessoa individual + uma do casal/família.
+    // Planejado vs. real: uma seção por pessoa individual + uma do casal.
     const labels = relatorio.planejadoVsReal.map((s) => s.label).sort();
-    expect(labels).toEqual(["Compartilhado", "Gabi", "Isa"]);
+    expect(labels).toEqual(["Casal", "Gabi", "Isa"]);
 
-    // A seção "Família" reflete o orçamento do casal (pessoaId nulo), mas o
-    // real considera todos os lançamentos do household no período (pessoaId
-    // nulo = sem filtro, mesma semântica de buscarPlanejadoVsReal).
-    const secaoFamilia = relatorio.planejadoVsReal.find(
-      (s) => s.pessoaId === null,
+    // A seção "Casal" tem planejado = soma do que Isa e Gabi planejaram
+    // (50_000 + 100_000) e real = só o gasto lançado em nome do próprio
+    // grupo (200_000, sem os 40_000 individuais da Isa — ver
+    // buscarLancamentosDoAno em relatorios.ts).
+    const secaoCasal = relatorio.planejadoVsReal.find(
+      (s) => s.pessoaId === casal.id,
     )!;
-    expect(secaoFamilia.itens[0].meses[0]).toMatchObject({
+    expect(secaoCasal.itens[0].meses[0]).toMatchObject({
       mes: 1,
       planejadoCentavos: 150_000,
-      realCentavos: 240_000,
+      realCentavos: 200_000,
       dentroDoPlanejado: false,
     });
 
@@ -319,9 +322,6 @@ describe("buscarRelatorioAnual", () => {
 
     expect(relatorio.divisaoDespesas).toBeNull();
     expect(relatorio.evolucaoPatrimonio).toEqual([]);
-    expect(relatorio.planejadoVsReal.map((s) => s.label)).toEqual([
-      "Isa",
-      "Compartilhado",
-    ]);
+    expect(relatorio.planejadoVsReal.map((s) => s.label)).toEqual(["Isa"]);
   });
 });
