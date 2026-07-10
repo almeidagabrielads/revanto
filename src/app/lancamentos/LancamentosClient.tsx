@@ -197,6 +197,8 @@ export function LancamentosClient() {
   const [categoriaEmMassa, setCategoriaEmMassa] = useState("");
   const [paginaLancamentos, setPaginaLancamentos] = useState(0);
   const [detalheId, setDetalheId] = useState<string | null>(null);
+  const [modalNovoAberto, setModalNovoAberto] = useState(false);
+  const [modalImportarAberto, setModalImportarAberto] = useState(false);
   const inputArquivoRef = useRef<HTMLInputElement>(null);
 
   function carregar() {
@@ -423,6 +425,7 @@ export function LancamentosClient() {
       ...formVazio({ bancoId: atual.bancoId, pessoaId: atual.pessoaDivisaoId }),
     }));
     setToast("Lançamento salvo com sucesso!");
+    setModalNovoAberto(false);
     carregar();
   }
 
@@ -502,6 +505,7 @@ export function LancamentosClient() {
         return [...atual, ...novas.filter((l) => !hashesAtuais.has(l.hash))];
       });
       setPaginaRevisao(0);
+      setModalImportarAberto(false);
     } finally {
       setAnalisando(false);
     }
@@ -597,6 +601,26 @@ export function LancamentosClient() {
     <div className="gap-lg flex flex-col">
       {dialogConfirmacao}
 
+      <div className="gap-sm flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-on-surface">Lançamentos</h1>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setModalNovoAberto(true)}
+            className="bg-primary px-lg text-on-primary rounded-full py-2 text-sm font-semibold hover:opacity-90"
+          >
+            Novo Lançamento
+          </button>
+          <button
+            type="button"
+            onClick={() => setModalImportarAberto(true)}
+            className="border-outline-variant bg-surface-container-lowest px-lg text-on-surface hover:bg-surface-container-low rounded-full border py-2 text-sm font-semibold"
+          >
+            Importar
+          </button>
+        </div>
+      </div>
+
       {toast && (
         <div className="bottom-lg right-lg bg-primary px-md text-on-primary fixed z-50 flex items-center gap-2 rounded-xl py-2.5 text-sm font-medium shadow-lg">
           <span aria-hidden>✓</span> {toast}
@@ -609,17 +633,43 @@ export function LancamentosClient() {
         </p>
       )}
 
-      <div className="gap-lg grid grid-cols-1 lg:grid-cols-[1fr_360px]">
-        {/* Lançamento Expresso */}
-        <form
-          onSubmit={criarLancamento}
-          className="gap-sm border-outline-variant bg-surface-container-lowest p-lg flex flex-col rounded-xl border"
+      {modalNovoAberto && (
+        <div
+          className="bg-on-surface/40 p-lg fixed inset-0 z-[100] flex items-center justify-center"
+          onClick={() => setModalNovoAberto(false)}
         >
-          <h2 className="text-on-surface flex items-center gap-1.5 text-lg font-bold">
-            <span aria-hidden>⚡</span> Lançamento Expresso
-          </h2>
+          <form
+            onSubmit={criarLancamento}
+            onClick={(e) => e.stopPropagation()}
+            className="gap-sm border-outline-variant bg-surface-container-lowest p-lg flex max-h-[90vh] w-full max-w-[36rem] flex-col overflow-y-auto rounded-2xl border shadow-lg"
+          >
+            <div className="flex items-center justify-between">
+              <h2 className="text-on-surface flex items-center gap-1.5 text-lg font-bold">
+                <span aria-hidden>⚡</span> Novo Lançamento
+              </h2>
+              <button
+                type="button"
+                onClick={() => setModalNovoAberto(false)}
+                title="Fechar"
+                aria-label="Fechar"
+                className="text-on-surface-variant hover:bg-surface-container rounded-full p-1.5"
+              >
+                <svg
+                  className="h-5 w-5"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M18 6 6 18" />
+                  <path d="m6 6 12 12" />
+                </svg>
+              </button>
+            </div>
 
-          <div className="gap-sm grid grid-cols-2 sm:grid-cols-4">
+            <div className="gap-sm grid grid-cols-2 sm:grid-cols-4">
             <div className="flex flex-col gap-1">
               <label
                 className="text-on-surface-variant text-xs font-semibold"
@@ -836,17 +886,52 @@ export function LancamentosClient() {
             )}
           </div>
 
-          <button
-            type="submit"
-            className="bg-primary px-lg text-on-primary mt-1 w-fit rounded-full py-2 text-sm font-semibold hover:opacity-90"
-          >
-            Salvar Lançamento
-          </button>
-        </form>
+            <button
+              type="submit"
+              className="bg-primary px-lg text-on-primary mt-1 w-fit rounded-full py-2 text-sm font-semibold hover:opacity-90"
+            >
+              Salvar Lançamento
+            </button>
+          </form>
+        </div>
+      )}
 
-        {/* Importar Extrato */}
-        <div className="gap-sm border-outline-variant bg-surface-container-lowest p-lg flex flex-col rounded-xl border border-dashed">
-          <div className="gap-sm grid grid-cols-1">
+      {modalImportarAberto && (
+        <div
+          className="bg-on-surface/40 p-lg fixed inset-0 z-[100] flex items-center justify-center"
+          onClick={() => setModalImportarAberto(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="gap-sm border-outline-variant bg-surface-container-lowest p-lg flex max-h-[90vh] w-full max-w-[36rem] flex-col overflow-y-auto rounded-2xl border shadow-lg"
+          >
+            <div className="flex items-center justify-between">
+              <h2 className="text-on-surface flex items-center gap-1.5 text-lg font-bold">
+                <span aria-hidden>⬆</span> Importar Extrato
+              </h2>
+              <button
+                type="button"
+                onClick={() => setModalImportarAberto(false)}
+                title="Fechar"
+                aria-label="Fechar"
+                className="text-on-surface-variant hover:bg-surface-container rounded-full p-1.5"
+              >
+                <svg
+                  className="h-5 w-5"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M18 6 6 18" />
+                  <path d="m6 6 12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="gap-sm grid grid-cols-1">
             <div className="flex flex-col gap-1">
               <label
                 className="text-on-surface-variant text-xs font-semibold"
@@ -958,6 +1043,7 @@ export function LancamentosClient() {
           </div>
         </div>
       </div>
+      )}
 
       {errosImportacao.length > 0 && (
         <div className="border-tertiary-container/30 bg-tertiary-container/10 p-sm text-tertiary-container rounded-xl border text-sm">
