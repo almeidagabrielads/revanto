@@ -19,6 +19,7 @@ const LINKS = [
   { href: "/orcamento", label: "Orçamento" },
 ];
 
+const ROTAS_PUBLICAS = ["/login", "/cadastro"];
 const MAX_AVATARES = 4;
 
 export function Nav() {
@@ -43,6 +44,17 @@ export function Nav() {
   }, [router]);
 
   useEffect(() => {
+    if (
+      usuario === null &&
+      !ROTAS_PUBLICAS.some(
+        (rota) => pathname === rota || pathname.startsWith(`${rota}/`),
+      )
+    ) {
+      router.replace("/login");
+    }
+  }, [pathname, router, usuario]);
+
+  useEffect(() => {
     if (!usuario) return;
     let cancelado = false;
     fetch("/api/pessoas")
@@ -60,11 +72,11 @@ export function Nav() {
   async function sair() {
     await fetch("/api/auth/logout", { method: "POST" });
     setUsuario(null);
-    router.push("/");
+    router.replace("/login");
     router.refresh();
   }
 
-  if (pathname === "/login" || pathname === "/cadastro") {
+  if (ROTAS_PUBLICAS.includes(pathname)) {
     return null;
   }
 
