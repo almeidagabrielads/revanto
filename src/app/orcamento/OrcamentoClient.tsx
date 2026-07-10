@@ -230,7 +230,7 @@ export function OrcamentoClient() {
             value={pessoaFiltro}
             onChange={setPessoaFiltro}
             options={[
-              { value: GRUPO_FAMILIA, label: "Compartilhado (casa toda)" },
+              { value: TOTAL_CASA, label: "Compartilhado (casa toda)" },
               ...pessoas.map((p) => ({ value: p.id, label: p.nome })),
             ]}
           />
