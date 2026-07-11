@@ -22,6 +22,8 @@ export const prismaTest = new PrismaClient({ adapter });
 // Apaga todos os dados na ordem inversa das FKs para permitir truncagem limpa.
 export async function limparBanco() {
   await prismaTest.$transaction([
+    prismaTest.calculadoraHistorico.deleteMany(),
+    prismaTest.calculadoraAnotacao.deleteMany(),
     prismaTest.lancamento.deleteMany(),
     prismaTest.receita.deleteMany(),
     prismaTest.orcamentoPlanejado.deleteMany(),

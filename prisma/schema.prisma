@@ -8,25 +8,52 @@ datasource db {
 }
 
 model Household {
-  id                   String                @id @default(cuid())
-  nome                 String                @unique
-  createdAt            DateTime              @default(now())
-  updatedAt            DateTime              @updatedAt
-  acertos              AcertoContas[]
-  atividades           AtividadeLog[]
-  bancos               Banco[]
-  categorias           Categoria[]
-  fechamentosAnuais    FechamentoAnual[]
-  integrantesGrupo     IntegranteGrupo[]
-  investimentos        Investimento[]
-  lancamentos          Lancamento[]
-  orcamentos           OrcamentoPlanejado[]
-  pessoas              Pessoa[]
-  posicoesInvestimento PosicaoInvestimento[]
-  posicoesPatrimonio   PosicaoPatrimonio[]
-  preferencia          Preferencia?
-  receitas             Receita[]
-  users                User[]
+  id                    String                 @id @default(cuid())
+  nome                  String                 @unique
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  acertos               AcertoContas[]
+  atividades            AtividadeLog[]
+  bancos                Banco[]
+  calculadoraAnotacao   CalculadoraAnotacao?
+  calculadoraHistorico  CalculadoraHistorico[]
+  categorias            Categoria[]
+  fechamentosAnuais     FechamentoAnual[]
+  integrantesGrupo      IntegranteGrupo[]
+  investimentos         Investimento[]
+  lancamentos           Lancamento[]
+  orcamentos            OrcamentoPlanejado[]
+  pessoas               Pessoa[]
+  posicoesInvestimento  PosicaoInvestimento[]
+  posicoesPatrimonio    PosicaoPatrimonio[]
+  preferencia           Preferencia?
+  receitas              Receita[]
+  users                 User[]
+}
+
+// Histórico de cálculos feitos na calculadora lateral (ver
+// src/lib/domain/calculadora.ts). Guarda a expressão e o resultado já
+// formatados (não o valor numérico bruto) — é um registro de apoio, não um
+// dado financeiro sujeito às regras de centavos/integer do restante do app.
+model CalculadoraHistorico {
+  id          String    @id @default(cuid())
+  householdId String
+  expressao   String
+  resultado   String
+  createdAt   DateTime  @default(now())
+  household   Household @relation(fields: [householdId], references: [id])
+
+  @@index([householdId, createdAt])
+}
+
+// Bloco de anotações da calculadora lateral — um texto livre por household.
+model CalculadoraAnotacao {
+  id          String    @id @default(cuid())
+  householdId String    @unique
+  texto       String    @default("")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  household   Household @relation(fields: [householdId], references: [id])
 }
 
 model Preferencia {

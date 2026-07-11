@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { corPessoa } from "./components/PessoaBadge";
+import { CalculadoraLateral } from "./components/CalculadoraLateral";
 import { unicosPorId } from "@/lib/dedupe";
 
 type Usuario = { id: string; email: string; nome: string };
@@ -63,7 +64,7 @@ export function Nav() {
         const dados: Pessoa[] = await response.json();
         setPessoas(unicosPorId(dados).filter((p) => p.tipo === "INDIVIDUAL"));
       })
-      .catch(() => { });
+      .catch(() => {});
     return () => {
       cancelado = true;
     };
@@ -118,6 +119,7 @@ export function Nav() {
               >
                 <span className="text-base leading-none">+</span> Transação
               </Link>
+              <CalculadoraLateral />
               <Link
                 href="/configuracoes"
                 aria-label="Configurações"

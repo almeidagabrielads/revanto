@@ -70,6 +70,19 @@ body {
   font-weight: 500;
 }
 
+/* Calculadora lateral: modo "selecionar valor da tela" (ver CalculadoraLateral.tsx) */
+.calc-selecionando .data-tabular {
+  cursor: pointer;
+  outline: 2px dashed var(--color-secondary);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.calc-selecionado-flash {
+  background-color: var(--color-secondary-container);
+  transition: background-color 0.5s ease;
+}
+
 /* Clickable elements always show pointer cursor */
 button:not(:disabled),
 a,
