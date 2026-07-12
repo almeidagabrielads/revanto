@@ -216,3 +216,69 @@ export async function removerLancamento(
 
   return prisma.lancamento.delete({ where: { id } });
 }
+
+export type SugestaoDescricao = {
+  descricao: string;
+  categoriaId: string | null;
+  subcategoriaId: string | null;
+  pessoaDivisaoId: string;
+  tipoGasto: string;
+};
+
+// Normaliza para comparação de descrições ignorando maiúsculas/minúsculas e
+// acentos gráficos (autocomplete não deve diferenciá-los).
+export function normalizarDescricaoParaBusca(descricao: string): string {
+  return descricao
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
+const MAX_LANCAMENTOS_HISTORICO_DESCRICAO = 500;
+const MAX_SUGESTOES_DESCRICAO = 8;
+
+// Sugestões de descrição para autocomplete ao lançar: entre os lançamentos
+// anteriores do household cuja descrição (normalizada) contém o termo
+// buscado, retorna uma por descrição distinta — a do lançamento mais recente
+// com aquela descrição — já com categoria/subcategoria/divisão/tipo de gasto
+// para preencher o formulário quando o usuário selecionar a sugestão.
+export async function buscarSugestoesDescricao(
+  prisma: PrismaClient,
+  householdId: string,
+  termo: string,
+): Promise<SugestaoDescricao[]> {
+  const termoNormalizado = normalizarDescricaoParaBusca(termo);
+  if (!termoNormalizado) return [];
+
+  const lancamentos = await prisma.lancamento.findMany({
+    where: { householdId, descricaoPropria: { not: null } },
+    select: {
+      descricaoPropria: true,
+      categoriaId: true,
+      subcategoriaId: true,
+      pessoaDivisaoId: true,
+      tipoGasto: true,
+    },
+    orderBy: [{ data: "desc" }, { createdAt: "desc" }],
+    take: MAX_LANCAMENTOS_HISTORICO_DESCRICAO,
+  });
+
+  const vistos = new Set<string>();
+  const sugestoes: SugestaoDescricao[] = [];
+  for (const lancamento of lancamentos) {
+    const descricao = lancamento.descricaoPropria as string;
+    const chave = normalizarDescricaoParaBusca(descricao);
+    if (!chave.includes(termoNormalizado) || vistos.has(chave)) continue;
+    vistos.add(chave);
+    sugestoes.push({
+      descricao,
+      categoriaId: lancamento.categoriaId,
+      subcategoriaId: lancamento.subcategoriaId,
+      pessoaDivisaoId: lancamento.pessoaDivisaoId,
+      tipoGasto: lancamento.tipoGasto,
+    });
+    if (sugestoes.length >= MAX_SUGESTOES_DESCRICAO) break;
+  }
+  return sugestoes;
+}

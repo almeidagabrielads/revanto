@@ -8,6 +8,7 @@ import { criarInvestimento } from "./investimentos";
 import {
   atualizarLancamento,
   buscarLancamento,
+  buscarSugestoesDescricao,
   criarLancamento,
   listarLancamentos,
   removerLancamento,
@@ -572,5 +573,98 @@ describe("listarLancamentos (filtros)", () => {
 
     const lancamentos = await listarLancamentos(prismaTest, h2.id);
     expect(lancamentos).toHaveLength(0);
+  });
+});
+
+describe("buscarSugestoesDescricao", () => {
+  it("ignora maiúsculas/minúsculas e acentos ao buscar", async () => {
+    const h = await criarHousehold();
+    const { categoria, subcategoria, banco, isa, gabi } = await montarCadastros(
+      h.id,
+    );
+    await criarLancamento(prismaTest, h.id, {
+      data: new Date("2026-06-10"),
+      descricaoPropria: "Padaria Açúcar",
+      valorCentavos: 1500,
+      categoriaId: categoria.id,
+      subcategoriaId: subcategoria.id,
+      bancoId: banco.id,
+      pessoaDivisaoId: gabi.id,
+      pessoaPagouId: isa.id,
+      tipoGasto: "FIXO",
+    });
+
+    const sugestoes = await buscarSugestoesDescricao(prismaTest, h.id, "acucar");
+
+    expect(sugestoes).toHaveLength(1);
+    expect(sugestoes[0].descricao).toBe("Padaria Açúcar");
+    expect(sugestoes[0].categoriaId).toBe(categoria.id);
+    expect(sugestoes[0].subcategoriaId).toBe(subcategoria.id);
+    expect(sugestoes[0].pessoaDivisaoId).toBe(gabi.id);
+    expect(sugestoes[0].tipoGasto).toBe("FIXO");
+  });
+
+  it("retorna apenas uma sugestão por descrição, com os dados do lançamento mais recente", async () => {
+    const h = await criarHousehold();
+    const { categoria, banco, isa, gabi } = await montarCadastros(h.id);
+    const outraCategoria = await criarCategoria(prismaTest, h.id, {
+      nome: "Lazer",
+    });
+    await criarLancamento(prismaTest, h.id, {
+      data: new Date("2026-05-01"),
+      descricaoPropria: "Supermercado",
+      valorCentavos: 1000,
+      categoriaId: categoria.id,
+      bancoId: banco.id,
+      pessoaDivisaoId: isa.id,
+      pessoaPagouId: isa.id,
+      tipoGasto: "VARIAVEL",
+    });
+    await criarLancamento(prismaTest, h.id, {
+      data: new Date("2026-06-01"),
+      descricaoPropria: "supermercado",
+      valorCentavos: 2000,
+      categoriaId: outraCategoria.id,
+      bancoId: banco.id,
+      pessoaDivisaoId: gabi.id,
+      pessoaPagouId: gabi.id,
+      tipoGasto: "FIXO",
+    });
+
+    const sugestoes = await buscarSugestoesDescricao(
+      prismaTest,
+      h.id,
+      "mercado",
+    );
+
+    expect(sugestoes).toHaveLength(1);
+    expect(sugestoes[0].descricao).toBe("supermercado");
+    expect(sugestoes[0].categoriaId).toBe(outraCategoria.id);
+    expect(sugestoes[0].pessoaDivisaoId).toBe(gabi.id);
+    expect(sugestoes[0].tipoGasto).toBe("FIXO");
+  });
+
+  it("não sugere descrições de outro household", async () => {
+    const h1 = await criarHousehold("Casa A");
+    const h2 = await criarHousehold("Casa B");
+    const { banco, isa } = await montarCadastros(h1.id);
+    await criarLancamento(prismaTest, h1.id, {
+      data: new Date("2026-06-10"),
+      descricaoPropria: "Aluguel",
+      valorCentavos: 150000,
+      bancoId: banco.id,
+      pessoaDivisaoId: isa.id,
+      pessoaPagouId: isa.id,
+      tipoGasto: "FIXO",
+    });
+
+    const sugestoes = await buscarSugestoesDescricao(prismaTest, h2.id, "alu");
+    expect(sugestoes).toHaveLength(0);
+  });
+
+  it("retorna lista vazia para termo em branco", async () => {
+    const h = await criarHousehold();
+    const sugestoes = await buscarSugestoesDescricao(prismaTest, h.id, "   ");
+    expect(sugestoes).toHaveLength(0);
   });
 });

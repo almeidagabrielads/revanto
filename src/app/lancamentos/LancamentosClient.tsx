@@ -5,6 +5,10 @@ import { PessoaBadge } from "../components/PessoaBadge";
 import { useConfirmDialog } from "../components/ConfirmDialog";
 import { ColumnHeader } from "../components/ColumnHeader";
 import { Select } from "../components/Select";
+import {
+  DescricaoAutocomplete,
+  type SugestaoDescricao,
+} from "../components/DescricaoAutocomplete";
 import { useTabela, type ColunaTabela } from "../components/useTabela";
 import type { FiltroColuna } from "@/lib/domain/tabela";
 
@@ -449,6 +453,17 @@ export function LancamentosClient() {
     carregar();
   }
 
+  function aoSelecionarSugestaoDescricao(sugestao: SugestaoDescricao) {
+    setForm((atual) => ({
+      ...atual,
+      descricaoPropria: sugestao.descricao,
+      categoriaId: sugestao.categoriaId ?? SEM_CATEGORIA,
+      subcategoriaId: sugestao.subcategoriaId ?? SEM_CATEGORIA,
+      pessoaDivisaoId: sugestao.pessoaDivisaoId,
+      tipoGasto: sugestao.tipoGasto,
+    }));
+  }
+
   async function atualizarLancamento(id: string, input: Partial<Lancamento>) {
     setErro(null);
     const response = await fetch(`/api/lancamentos/${id}`, {
@@ -773,14 +788,13 @@ export function LancamentosClient() {
             >
               Descrição
             </label>
-            <input
+            <DescricaoAutocomplete
               id="l-descricao"
               className={inputClass}
               placeholder="Ex: Supermercado"
               value={form.descricaoPropria}
-              onChange={(e) =>
-                setForm({ ...form, descricaoPropria: e.target.value })
-              }
+              onChange={(v) => setForm({ ...form, descricaoPropria: v })}
+              onSelecionar={aoSelecionarSugestaoDescricao}
             />
           </div>
 
