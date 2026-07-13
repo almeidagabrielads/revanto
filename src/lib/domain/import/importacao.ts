@@ -34,8 +34,23 @@ export type LinhaPreview = {
 };
 
 export type ResultadoPreview =
-  | { ok: true; linhas: LinhaPreview[]; erros: ErroImportacao[] }
+  | {
+      ok: true;
+      linhas: LinhaPreview[];
+      erros: ErroImportacao[];
+      // Linhas anteriores ao período inicial informado — descartadas antes
+      // mesmo de entrar na revisão (não contam como erro).
+      ignoradasAntesDoPeriodo: number;
+    }
   | { ok: false; erro: string };
+
+// "AAAA-MM-DD" (valor de <input type="date">) para Date em UTC 00:00.
+function parseDataLimite(iso: string): Date | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso.trim());
+  if (!match) return null;
+  const [, ano, mes, dia] = match;
+  return new Date(Date.UTC(Number(ano), Number(mes) - 1, Number(dia)));
+}
 
 // Faz o parsing do CSV e monta o preview de importação (RF06): marca linhas
 // já importadas anteriormente (mesmo hash de data+descrição+valor+banco) e
@@ -44,13 +59,25 @@ export type ResultadoPreview =
 export async function gerarPreviewImportacao(
   prisma: PrismaClient,
   householdId: string,
-  // bancoId é opcional: alguns modelos de arquivo já trazem o banco por
-  // linha (colunaBanco) — nesse caso o usuário só precisa de um banco
-  // padrão para as linhas em que o arquivo não indicar nada.
-  opts: { bancoId?: string | null; templateId: string; csvTexto: string },
+  opts: {
+    // bancoId é opcional: alguns modelos de arquivo já trazem o banco por
+    // linha (colunaBanco) — nesse caso o usuário só precisa de um banco
+    // padrão para as linhas em que o arquivo não indicar nada.
+    bancoId?: string | null;
+    templateId: string;
+    csvTexto: string;
+    // Quando informado, linhas com data anterior a este período são
+    // ignoradas antes da revisão (ex.: reimportar só o mês corrente de um
+    // extrato que cobre o ano inteiro).
+    dataInicial?: string | null;
+  },
 ): Promise<ResultadoPreview> {
   const template = buscarTemplate(opts.templateId);
   if (!template) return { ok: false, erro: "Modelo de importação inválido." };
+
+  if (opts.dataInicial && !parseDataLimite(opts.dataInicial)) {
+    return { ok: false, erro: "Período inicial inválido." };
+  }
 
   const [bancos, pessoas, categorias] = await Promise.all([
     prisma.banco.findMany({ where: { householdId } }),
@@ -75,7 +102,18 @@ export async function gerarPreviewImportacao(
     return { ok: false, erro: "Banco inválido." };
   }
 
-  const { linhas, erros } = parseImportacao(opts.csvTexto, template);
+  const { linhas: todasLinhas, erros } = parseImportacao(
+    opts.csvTexto,
+    template,
+  );
+
+  const dataLimite = opts.dataInicial
+    ? parseDataLimite(opts.dataInicial)
+    : null;
+  const linhas = dataLimite
+    ? todasLinhas.filter((linha) => linha.data >= dataLimite)
+    : todasLinhas;
+  const ignoradasAntesDoPeriodo = todasLinhas.length - linhas.length;
 
   const bancosResolvidos = linhas.map((linha) => {
     if (linha.bancoOrigem) {
@@ -171,7 +209,7 @@ export async function gerarPreviewImportacao(
     };
   });
 
-  return { ok: true, linhas: previewLinhas, erros };
+  return { ok: true, linhas: previewLinhas, erros, ignoradasAntesDoPeriodo };
 }
 
 export type LinhaConfirmacao = {

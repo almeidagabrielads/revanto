@@ -98,6 +98,42 @@ describe("gerarPreviewImportacao + confirmarImportacao — importação nova", (
   });
 });
 
+describe("gerarPreviewImportacao — período inicial", () => {
+  it("ignora linhas anteriores ao período inicial informado", async () => {
+    const h = await criarHousehold();
+    const { banco } = await montarCadastros(h.id);
+
+    const preview = await gerarPreviewImportacao(prismaTest, h.id, {
+      bancoId: banco.id,
+      templateId: "nubank_cartao",
+      csvTexto: CSV_NUBANK_CARTAO,
+      dataInicial: "2026-06-11",
+    });
+
+    expect(preview.ok).toBe(true);
+    if (!preview.ok) return;
+    expect(preview.linhas).toHaveLength(1);
+    expect(preview.linhas[0].descricaoOrigem).toBe("Farmácia Popular");
+    expect(preview.ignoradasAntesDoPeriodo).toBe(1);
+  });
+
+  it("sem período inicial, não ignora nenhuma linha", async () => {
+    const h = await criarHousehold();
+    const { banco } = await montarCadastros(h.id);
+
+    const preview = await gerarPreviewImportacao(prismaTest, h.id, {
+      bancoId: banco.id,
+      templateId: "nubank_cartao",
+      csvTexto: CSV_NUBANK_CARTAO,
+    });
+
+    expect(preview.ok).toBe(true);
+    if (!preview.ok) return;
+    expect(preview.linhas).toHaveLength(2);
+    expect(preview.ignoradasAntesDoPeriodo).toBe(0);
+  });
+});
+
 describe("gerarPreviewImportacao + confirmarImportacao — detecção de duplicado", () => {
   it("marca como duplicado no preview e não recria ao confirmar de novo", async () => {
     const h = await criarHousehold();

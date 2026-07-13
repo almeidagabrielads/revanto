@@ -218,6 +218,9 @@ export function LancamentosClient() {
   const [importTemplateId, setImportTemplateId] = useState("");
   const [importPessoaDivisaoId, setImportPessoaDivisaoId] = useState("");
   const [importPessoaPagouId, setImportPessoaPagouId] = useState("");
+  // Ignora linhas do arquivo anteriores a esta data (AAAA-MM-DD) — útil ao
+  // reimportar um extrato que cobre um período maior do que o necessário.
+  const [importDataInicial, setImportDataInicial] = useState("");
   const [arrastandoArquivo, setArrastandoArquivo] = useState(false);
   const [arquivoSelecionado, setArquivoSelecionado] = useState<File | null>(
     null,
@@ -227,6 +230,7 @@ export function LancamentosClient() {
   const [resumoImportacao, setResumoImportacao] = useState<{
     novas: number;
     duplicadas: number;
+    ignoradasAntesDoPeriodo: number;
     erros: ErroImportacao[];
   } | null>(null);
   const [errosDetalheAberto, setErrosDetalheAberto] = useState(false);
@@ -642,10 +646,13 @@ export function LancamentosClient() {
   function resumoImportacaoTexto(r: {
     novas: number;
     duplicadas: number;
+    ignoradasAntesDoPeriodo: number;
     erros: ErroImportacao[];
   }): string {
     const partes = [`${r.novas} pronto(s) para revisão`];
     if (r.duplicadas > 0) partes.push(`${r.duplicadas} duplicado(s)`);
+    if (r.ignoradasAntesDoPeriodo > 0)
+      partes.push(`${r.ignoradasAntesDoPeriodo} fora do período`);
     if (r.erros.length > 0)
       partes.push(`${r.erros.length} com erro de leitura`);
     return partes.join(", ") + ".";
@@ -675,6 +682,7 @@ export function LancamentosClient() {
           bancoId: importBancoId || null,
           templateId: importTemplateId,
           csv,
+          dataInicial: importDataInicial || null,
         }),
       });
       if (!response.ok) {
@@ -683,6 +691,7 @@ export function LancamentosClient() {
       }
       const body = await response.json();
       const erros: ErroImportacao[] = body.erros ?? [];
+      const ignoradasAntesDoPeriodo: number = body.ignoradasAntesDoPeriodo ?? 0;
       const linhasPreview = body.linhas as LinhaPreview[];
       const novas: LinhaRevisao[] = linhasPreview.map((linha) => ({
         ...linha,
@@ -701,6 +710,7 @@ export function LancamentosClient() {
       setResumoImportacao({
         novas: linhasPreview.filter((l) => !l.duplicado).length,
         duplicadas: linhasPreview.filter((l) => l.duplicado).length,
+        ignoradasAntesDoPeriodo,
         erros,
       });
       setArquivoSelecionado(null);
@@ -1305,6 +1315,27 @@ export function LancamentosClient() {
                         ...pessoas.map((p) => ({ value: p.id, label: p.nome })),
                       ]}
                     />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label
+                      className="text-on-surface-variant text-xs font-semibold"
+                      htmlFor="i-data-inicial"
+                    >
+                      Período inicial{" "}
+                      <span className="text-on-surface-variant font-normal">
+                        (opcional)
+                      </span>
+                    </label>
+                    <input
+                      id="i-data-inicial"
+                      type="date"
+                      className={inputClass}
+                      value={importDataInicial}
+                      onChange={(e) => setImportDataInicial(e.target.value)}
+                    />
+                    <p className="text-on-surface-variant text-xs">
+                      Lançamentos anteriores a esta data são ignorados.
+                    </p>
                   </div>
                 </div>
 

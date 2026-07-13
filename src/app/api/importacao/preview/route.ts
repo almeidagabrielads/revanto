@@ -11,6 +11,8 @@ const PreviewSchema = z.object({
   bancoId: z.string().trim().min(1).nullish(),
   templateId: z.string().trim().min(1, "Modelo de importação é obrigatório."),
   csv: z.string().min(1, "Arquivo CSV vazio."),
+  // Opcional: ignora linhas anteriores a este período (AAAA-MM-DD).
+  dataInicial: z.string().trim().min(1).nullish(),
 });
 
 export async function POST(request: NextRequest) {
@@ -32,6 +34,7 @@ export async function POST(request: NextRequest) {
     bancoId: validatedFields.data.bancoId,
     templateId: validatedFields.data.templateId,
     csvTexto: validatedFields.data.csv,
+    dataInicial: validatedFields.data.dataInicial,
   });
 
   if (!resultado.ok) {
