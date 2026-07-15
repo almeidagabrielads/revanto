@@ -8,7 +8,7 @@ export default function RelatoriosPage() {
           Relatórios financeiros
         </h1>
         <p className="text-on-surface-variant text-sm">
-          Analise o desempenho financeiro do FINANCO.
+          Analise o desempenho financeiro do REVANTO.
         </p>
       </div>
       <RelatoriosClient />

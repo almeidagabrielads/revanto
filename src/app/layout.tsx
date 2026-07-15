@@ -9,7 +9,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "FINANCO",
+  title: "REVANTO",
   description: "Gestão financeira compartilhada",
 };
 

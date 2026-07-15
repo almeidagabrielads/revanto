@@ -86,7 +86,7 @@ export function Nav() {
       <div className="px-lg mx-auto flex h-16 max-w-[1400px] items-center justify-between">
         <div className="gap-xl flex items-center">
           <Link href="/" className="flex items-baseline gap-1.5">
-            <span className="text-primary text-lg font-bold">FINANCO</span>
+            <span className="text-primary text-lg font-bold">REVANTO</span>
           </Link>
           <nav className="gap-xs hidden items-center md:flex">
             {LINKS.map((link) => {
