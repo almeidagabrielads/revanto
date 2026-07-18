@@ -670,9 +670,10 @@ export function InvestimentosClient() {
                               investimentoId={inv.id}
                               ano={anoPosicoes}
                               posicoes={posicoesMensais}
-                              onAlterado={() =>
-                                setReloadPosicoesToken((t) => t + 1)
-                              }
+                              onAlterado={() => {
+                                setReloadPosicoesToken((t) => t + 1);
+                                setReloadToken((t) => t + 1);
+                              }}
                             />
                           </td>
                         </tr>

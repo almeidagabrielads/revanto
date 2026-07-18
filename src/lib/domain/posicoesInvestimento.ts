@@ -20,6 +20,27 @@ function inicioDoMes(data: Date): Date {
   return new Date(Date.UTC(data.getUTCFullYear(), data.getUTCMonth(), 1));
 }
 
+/**
+ * O valor atual do investimento deve sempre refletir o último mês
+ * preenchido na carteira. Chamado após qualquer upsert/remoção de posição.
+ */
+async function sincronizarValorAtual(
+  prisma: PrismaClient,
+  householdId: string,
+  investimentoId: string,
+) {
+  const ultimaPosicao = await prisma.posicaoInvestimento.findFirst({
+    where: { householdId, investimentoId },
+    orderBy: { mes: "desc" },
+  });
+  if (!ultimaPosicao) return;
+
+  await prisma.investimento.update({
+    where: { id: investimentoId },
+    data: { valorAtualCentavos: ultimaPosicao.valorCentavos },
+  });
+}
+
 export function listarPosicoesInvestimento(
   prisma: PrismaClient,
   householdId: string,
@@ -44,7 +65,7 @@ export async function upsertPosicaoInvestimento(
   if (!investimento) return null;
 
   const mes = inicioDoMes(input.mes);
-  return prisma.posicaoInvestimento.upsert({
+  const posicao = await prisma.posicaoInvestimento.upsert({
     where: {
       investimentoId_mes: { investimentoId: input.investimentoId, mes },
     },
@@ -56,6 +77,10 @@ export async function upsertPosicaoInvestimento(
     },
     update: { valorCentavos: input.valorCentavos },
   });
+
+  await sincronizarValorAtual(prisma, householdId, input.investimentoId);
+
+  return posicao;
 }
 
 export async function removerPosicaoInvestimento(
@@ -69,7 +94,11 @@ export async function removerPosicaoInvestimento(
   if (!investimento) return null;
 
   const mes = inicioDoMes(input.mes);
-  return prisma.posicaoInvestimento.deleteMany({
+  const resultado = await prisma.posicaoInvestimento.deleteMany({
     where: { householdId, investimentoId: input.investimentoId, mes },
   });
+
+  await sincronizarValorAtual(prisma, householdId, input.investimentoId);
+
+  return resultado;
 }
