@@ -85,87 +85,93 @@ describe("GET /api/acertos", () => {
 });
 
 describe("POST /api/acertos", () => {
+  async function criarDuasPessoas(householdId: string) {
+    const isa = await prismaTest.pessoa.create({
+      data: { nome: "Isa", tipo: "INDIVIDUAL", householdId },
+    });
+    const gabi = await prismaTest.pessoa.create({
+      data: { nome: "Gabi", tipo: "INDIVIDUAL", householdId },
+    });
+    return { isa, gabi };
+  }
+
   it("retorna 401 sem sessão", async () => {
     const response = await POST(
-      postRequest({ dataInicio: "2026-01-01", dataFim: "2026-01-31" }),
+      postRequest({
+        deId: "a",
+        paraId: "b",
+        valorCentavos: 1000,
+        data: "2026-01-05",
+      }),
     );
     expect(response.status).toBe(401);
   });
 
-  it("retorna 400 para datas inválidas", async () => {
+  it("retorna 400 para dados inválidos", async () => {
     const { cookie } = await criarHouseholdComSessao();
     const response = await POST(
-      postRequest({ dataInicio: "não é data", dataFim: "2026-01-31" }, cookie),
+      postRequest(
+        { deId: "a", paraId: "b", valorCentavos: "não é número", data: "2026-01-05" },
+        cookie,
+      ),
     );
     expect(response.status).toBe(400);
   });
 
-  it("retorna 400 quando não há pelo menos duas pessoas Individual", async () => {
-    const { cookie } = await criarHouseholdComSessao();
-    const response = await POST(
-      postRequest({ dataInicio: "2026-01-01", dataFim: "2026-01-31" }, cookie),
-    );
-    expect(response.status).toBe(400);
-  });
-
-  it("registra a transferência sugerida do período como acerto resolvido", async () => {
+  it("retorna 400 quando origem e destino são a mesma pessoa", async () => {
     const { household, cookie } = await criarHouseholdComSessao();
-    const isa = await prismaTest.pessoa.create({
-      data: { nome: "Isa", tipo: "INDIVIDUAL", householdId: household.id },
-    });
-    const gabi = await prismaTest.pessoa.create({
-      data: { nome: "Gabi", tipo: "INDIVIDUAL", householdId: household.id },
-    });
-    const categoria = await prismaTest.categoria.create({
-      data: { nome: "Moradia", householdId: household.id },
-    });
-    const banco = await prismaTest.banco.create({
-      data: { nome: "Nubank", tipo: "CONTA_CORRENTE", householdId: household.id },
-    });
-    await prismaTest.lancamento.create({
-      data: {
-        data: new Date(Date.UTC(2026, 0, 10)),
-        valorCentavos: 100_00,
-        householdId: household.id,
-        categoriaId: categoria.id,
-        bancoId: banco.id,
-        pessoaDivisaoId: isa.id,
-        pessoaPagouId: gabi.id,
-      },
-    });
+    const { gabi } = await criarDuasPessoas(household.id);
+    const response = await POST(
+      postRequest(
+        { deId: gabi.id, paraId: gabi.id, valorCentavos: 1000, data: "2026-01-05" },
+        cookie,
+      ),
+    );
+    expect(response.status).toBe(400);
+  });
+
+  it("retorna 400 quando origem/destino não são pessoas Individual da casa", async () => {
+    const { cookie } = await criarHouseholdComSessao();
+    const response = await POST(
+      postRequest(
+        {
+          deId: "inexistente-1",
+          paraId: "inexistente-2",
+          valorCentavos: 1000,
+          data: "2026-01-05",
+        },
+        cookie,
+      ),
+    );
+    expect(response.status).toBe(400);
+  });
+
+  it("registra o repasse como acerto e retorna o registro criado", async () => {
+    const { household, cookie } = await criarHouseholdComSessao();
+    const { isa, gabi } = await criarDuasPessoas(household.id);
 
     const response = await POST(
-      postRequest({ dataInicio: "2026-01-01", dataFim: "2026-01-31" }, cookie),
+      postRequest(
+        {
+          deId: gabi.id,
+          paraId: isa.id,
+          valorCentavos: 1_000_000,
+          data: "2026-01-05",
+        },
+        cookie,
+      ),
     );
     const body = await response.json();
 
     expect(response.status).toBe(201);
-    expect(body).toHaveLength(1);
-    expect(body[0].deId).toBe(isa.id);
-    expect(body[0].paraId).toBe(gabi.id);
-    expect(body[0].valorCentavos).toBe(100_00);
+    expect(body.deId).toBe(gabi.id);
+    expect(body.paraId).toBe(isa.id);
+    expect(body.valorCentavos).toBe(1_000_000);
 
     const historico = await prismaTest.acertoContas.findMany({
       where: { householdId: household.id },
     });
     expect(historico).toHaveLength(1);
-  });
-
-  it("não registra nada quando as contas já estão quitadas", async () => {
-    const { household, cookie } = await criarHouseholdComSessao();
-    await prismaTest.pessoa.create({
-      data: { nome: "Isa", tipo: "INDIVIDUAL", householdId: household.id },
-    });
-    await prismaTest.pessoa.create({
-      data: { nome: "Gabi", tipo: "INDIVIDUAL", householdId: household.id },
-    });
-
-    const response = await POST(
-      postRequest({ dataInicio: "2026-01-01", dataFim: "2026-01-31" }, cookie),
-    );
-    const body = await response.json();
-
-    expect(response.status).toBe(201);
-    expect(body).toEqual([]);
+    expect(historico[0].dataInicio).toEqual(historico[0].dataFim);
   });
 });

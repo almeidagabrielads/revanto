@@ -2,7 +2,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { limparBanco, prismaTest } from "@/test/prisma";
 import { criarPessoa } from "./pessoas";
 import { hashPassword } from "@/lib/auth/password";
-import { listarAcertos, registrarAcerto } from "./acertos";
+import { listarAcertos, registrarAcerto, registrarRepasse } from "./acertos";
 
 beforeAll(async () => {
   await limparBanco();
@@ -71,6 +71,53 @@ describe("registrarAcerto", () => {
     });
 
     expect(criados).toEqual([]);
+  });
+});
+
+describe("registrarRepasse", () => {
+  it("grava um AcertoContas com dataInicio/dataFim iguais à data do repasse", async () => {
+    const { household, isa, gabi, user } = await montarBase();
+    const data = new Date(Date.UTC(2026, 0, 15));
+
+    const criado = await registrarRepasse(prismaTest, household.id, {
+      deId: gabi.id,
+      paraId: isa.id,
+      valorCentavos: 10_000_00,
+      data,
+      resolvidoPorUserId: user.id,
+    });
+
+    expect(criado).not.toBeNull();
+    expect(criado?.deId).toBe(gabi.id);
+    expect(criado?.paraId).toBe(isa.id);
+    expect(criado?.valorCentavos).toBe(10_000_00);
+
+    const historico = await prismaTest.acertoContas.findMany({
+      where: { householdId: household.id },
+    });
+    expect(historico).toHaveLength(1);
+    expect(historico[0].dataInicio).toEqual(historico[0].dataFim);
+  });
+
+  it("retorna null se deId não for uma pessoa Individual do household", async () => {
+    const { household, isa, user } = await montarBase();
+    const outraCasa = await prismaTest.household.create({
+      data: { nome: `Outra casa ${Math.random()}` },
+    });
+    const forasteiro = await criarPessoa(prismaTest, outraCasa.id, {
+      nome: "Forasteiro",
+      tipo: "INDIVIDUAL",
+    });
+
+    const criado = await registrarRepasse(prismaTest, household.id, {
+      deId: forasteiro.id,
+      paraId: isa.id,
+      valorCentavos: 1000,
+      data: new Date(Date.UTC(2026, 0, 15)),
+      resolvidoPorUserId: user.id,
+    });
+
+    expect(criado).toBeNull();
   });
 });
 

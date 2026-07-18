@@ -6,8 +6,9 @@ import { corPessoa } from "../components/PessoaBadge";
 import { ColumnHeader } from "../components/ColumnHeader";
 import { Select } from "../components/Select";
 import { useTabela, type ColunaTabela } from "../components/useTabela";
+import { RegistrarRepasseModal } from "./RegistrarRepasseModal";
 
-type Pessoa = { id: string; nome: string; tipo: string };
+export type Pessoa = { id: string; nome: string; tipo: string };
 type SaldoPessoa = { pessoaId: string; saldoCentavos: number };
 type Transferencia = { deId: string; paraId: string; valorCentavos: number };
 type TotalPagoPessoa = { pessoaId: string; totalCentavos: number };
@@ -102,10 +103,15 @@ function nomeMes(iso: string): string {
   return nome.charAt(0).toUpperCase() + nome.slice(1);
 }
 
-async function parseErro(response: Response): Promise<string> {
+export async function parseErro(response: Response): Promise<string> {
   const body = await response.json().catch(() => null);
   if (typeof body?.error === "string") return body.error;
   return "Não foi possível completar a operação.";
+}
+
+export function reaisParaCentavos(valor: string): number {
+  const normalizado = valor.replace(",", ".");
+  return Math.round(Number(normalizado || "0") * 100);
 }
 
 function IconeHistorico() {
@@ -152,8 +158,8 @@ export function DivisaoClient() {
   const [buscou, setBuscou] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [naoAutenticado, setNaoAutenticado] = useState(false);
-  const [resolvendo, setResolvendo] = useState(false);
-  const [resolvido, setResolvido] = useState(false);
+  const [modalRepasseAberto, setModalRepasseAberto] = useState(false);
+  const [repasseRegistrado, setRepasseRegistrado] = useState(false);
   const [filtroPessoa, setFiltroPessoa] = useState("");
   const [mostrarTodosLancamentos, setMostrarTodosLancamentos] = useState(false);
   const [mostrarHistoricoCompleto, setMostrarHistoricoCompleto] =
@@ -214,7 +220,7 @@ export function DivisaoClient() {
         if (cancelado || !response.ok) return;
         setHistorico(await response.json());
       })
-      .catch(() => {});
+      .catch(() => { });
     return () => {
       cancelado = true;
     };
@@ -230,21 +236,9 @@ export function DivisaoClient() {
     return nomePorId.get(id) ?? id;
   }
 
-  async function resolverAcerto() {
-    setErro(null);
-    setResolvendo(true);
-    setResolvido(false);
-    const response = await fetch("/api/acertos", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ dataInicio, dataFim }),
-    });
-    setResolvendo(false);
-    if (!response.ok) {
-      setErro(await parseErro(response));
-      return;
-    }
-    setResolvido(true);
+  function aoRegistrarRepasse() {
+    setModalRepasseAberto(false);
+    setRepasseRegistrado(true);
     setReloadToken((t) => t + 1);
   }
 
@@ -378,24 +372,32 @@ export function DivisaoClient() {
           )}
         </div>
 
-        {resumo && (
+        {resumo && resumo.participantes.length > 0 && (
           <div className="flex flex-col items-end gap-1">
             <button
-              onClick={resolverAcerto}
-              disabled={
-                resolvendo || resumo.transferenciasSugeridas.length === 0
-              }
-              className="bg-primary px-md text-on-primary flex items-center gap-1.5 rounded-full py-1.5 text-xs font-semibold hover:opacity-90 disabled:opacity-50"
+              onClick={() => {
+                setRepasseRegistrado(false);
+                setModalRepasseAberto(true);
+              }}
+              className="bg-primary px-md text-on-primary flex items-center gap-1.5 rounded-full py-1.5 text-xs font-semibold hover:opacity-90"
             >
               <IconeChecklist />
-              {resolvendo ? "Resolvendo…" : "Resolver acerto"}
+              Registrar repasse
             </button>
-            {resolvido && (
-              <span className="text-success text-xs">Acerto registrado.</span>
+            {repasseRegistrado && (
+              <span className="text-success text-xs">Repasse registrado.</span>
             )}
           </div>
         )}
       </div>
+
+      {modalRepasseAberto && (
+        <RegistrarRepasseModal
+          pessoas={pessoas.filter((p) => p.tipo === "INDIVIDUAL")}
+          onClose={() => setModalRepasseAberto(false)}
+          onRegistrado={aoRegistrarRepasse}
+        />
+      )}
 
       {buscou && resumo === null && (
         <p className="border-outline-variant bg-surface-container-lowest p-lg text-on-surface-variant rounded-xl border text-sm">
@@ -495,88 +497,7 @@ export function DivisaoClient() {
 
           <div className="gap-md grid grid-cols-1 lg:grid-cols-3">
             <div className="border-outline-variant bg-surface-container-lowest p-lg flex flex-col gap-2 rounded-xl border lg:col-span-2">
-              <h3 className="text-on-surface text-base font-semibold">
-                Detalhamento compartilhado
-              </h3>
-              <div className="border-outline-variant overflow-hidden rounded-lg border">
-                <table className="w-full text-sm">
-                  <thead className="bg-surface-container-low text-on-surface-variant text-left text-xs font-semibold">
-                    <tr>
-                      <ColumnHeader
-                        label="Despesa"
-                        chave="descricao"
-                        tipo="texto"
-                        ordenacao={ordenacao}
-                        onOrdenar={alternarOrdenacao}
-                        filtro={filtros.descricao}
-                        onFiltrar={definirFiltro}
-                        onLimparFiltro={limparFiltro}
-                      />
-                      <ColumnHeader
-                        label="Responsável"
-                        chave="responsavel"
-                        tipo="opcoes"
-                        opcoes={opcoesColunasLancamentos.responsavel}
-                        ordenacao={ordenacao}
-                        onOrdenar={alternarOrdenacao}
-                        filtro={filtros.responsavel}
-                        onFiltrar={definirFiltro}
-                        onLimparFiltro={limparFiltro}
-                      />
-                      <ColumnHeader
-                        label="Categoria"
-                        chave="categoria"
-                        tipo="opcoes"
-                        opcoes={opcoesColunasLancamentos.categoria}
-                        ordenacao={ordenacao}
-                        onOrdenar={alternarOrdenacao}
-                        filtro={filtros.categoria}
-                        onFiltrar={definirFiltro}
-                        onLimparFiltro={limparFiltro}
-                      />
-                      <ColumnHeader
-                        label="Valor"
-                        chave="valor"
-                        tipo="numero"
-                        align="right"
-                        ordenacao={ordenacao}
-                        onOrdenar={alternarOrdenacao}
-                        filtro={filtros.valor}
-                        onFiltrar={definirFiltro}
-                        onLimparFiltro={limparFiltro}
-                      />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {lancamentosVisiveis.map((l) => (
-                      <tr
-                        key={l.id}
-                        className="border-outline-variant border-t"
-                      >
-                        <td className="p-sm">
-                          {l.descricao || "—"}
-                          <span className="text-on-surface-variant ml-2 text-xs">
-                            {formatarDataCurta(l.data)}
-                          </span>
-                        </td>
-                        <td className="p-sm">
-                          <span
-                            className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold ${corPessoa(l.pessoaDivisaoId)}`}
-                          >
-                            {nome(l.pessoaDivisaoId).charAt(0).toUpperCase()}
-                          </span>
-                        </td>
-                        <td className="p-sm text-on-surface-variant">
-                          {l.categoriaNome ?? "Sem categoria"}
-                        </td>
-                        <td className="p-sm text-right font-medium">
-                          {centavosParaReais(l.valorCentavos)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+
               {lancamentosProcessados.length > 6 && (
                 <button
                   onClick={() => setMostrarTodosLancamentos((v) => !v)}

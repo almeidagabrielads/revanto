@@ -2,8 +2,11 @@ import { NextResponse, type NextRequest } from "next/server";
 import * as z from "zod";
 import { prisma } from "@/lib/prisma";
 import { verifySession } from "@/lib/auth/dal";
-import { ResolverAcertoSchema, listarAcertos, registrarAcerto } from "@/lib/domain/acertos";
-import { buscarSaldoDivisaoGrupo } from "@/lib/domain/split";
+import {
+  RegistrarRepasseSchema,
+  listarAcertos,
+  registrarRepasse,
+} from "@/lib/domain/acertos";
 import { registrarAtividade } from "@/lib/domain/atividades";
 import { rotularDispositivo } from "@/lib/auth/device";
 
@@ -24,7 +27,7 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json().catch(() => null);
-  const validatedFields = ResolverAcertoSchema.safeParse(body);
+  const validatedFields = RegistrarRepasseSchema.safeParse(body);
   if (!validatedFields.success) {
     return NextResponse.json(
       { error: z.treeifyError(validatedFields.error) },
@@ -32,37 +35,27 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { dataInicio, dataFim } = validatedFields.data;
-  const resumo = await buscarSaldoDivisaoGrupo(prisma, session.householdId, {
-    dataInicio,
-    dataFim,
+  const criado = await registrarRepasse(prisma, session.householdId, {
+    ...validatedFields.data,
+    resolvidoPorUserId: session.userId,
   });
-  if (!resumo) {
+  if (!criado) {
     return NextResponse.json(
       {
         error:
-          "É preciso ao menos duas pessoas do tipo Individual para registrar um acerto.",
+          "Origem e destino precisam ser pessoas do tipo Individual cadastradas nesta casa.",
       },
       { status: 400 },
     );
   }
 
-  const criados = await registrarAcerto(prisma, session.householdId, {
-    dataInicio,
-    dataFim,
-    transferencias: resumo.transferenciasSugeridas,
-    resolvidoPorUserId: session.userId,
-  });
+  await registrarAtividade(
+    prisma,
+    session.householdId,
+    session.userId,
+    `Registrou repasse de ${criado.de.nome} para ${criado.para.nome}`,
+    rotularDispositivo(request.headers.get("user-agent")),
+  ).catch(() => {});
 
-  if (criados.length > 0) {
-    await registrarAtividade(
-      prisma,
-      session.householdId,
-      session.userId,
-      "Resolveu acerto de contas",
-      rotularDispositivo(request.headers.get("user-agent")),
-    ).catch(() => {});
-  }
-
-  return NextResponse.json(criados, { status: 201 });
+  return NextResponse.json(criado, { status: 201 });
 }
