@@ -154,6 +154,65 @@ describe("buscarControlePagamento", () => {
     expect(isaPelaGabi?.porMes["2026-01"]).toBe(0);
   });
 
+  it("gastoTotal segue a regra do dashboard: divisão própria + fração nos grupos, sem repasses", async () => {
+    const { household, isa, gabi, familia, categoria, banco } = await montarBase();
+    await prismaTest.integranteGrupo.createMany({
+      data: [
+        { grupoId: familia.id, pessoaId: isa.id, peso: 1, householdId: household.id },
+        { grupoId: familia.id, pessoaId: gabi.id, peso: 1, householdId: household.id },
+      ],
+    });
+
+    // Gasto da Família de R$ 90,00 líquidos (fração de cada uma: R$ 45,00),
+    // pago pela Gabi — quem pagou não importa para o gasto total
+    await prismaTest.lancamento.create({
+      data: {
+        data: new Date(Date.UTC(2026, 0, 10)),
+        valorCentavos: 10_000,
+        descontoCentavos: 1_000,
+        householdId: household.id,
+        categoriaId: categoria.id,
+        bancoId: banco.id,
+        pessoaDivisaoId: familia.id,
+        pessoaPagouId: gabi.id,
+      },
+    });
+    // Gasto individual da Isa de R$ 50,00, pago pela Gabi
+    await prismaTest.lancamento.create({
+      data: {
+        data: new Date(Date.UTC(2026, 0, 12)),
+        valorCentavos: 5_000,
+        householdId: household.id,
+        categoriaId: categoria.id,
+        bancoId: banco.id,
+        pessoaDivisaoId: isa.id,
+        pessoaPagouId: gabi.id,
+      },
+    });
+    // Repasse não entra no gasto total
+    await prismaTest.acertoContas.create({
+      data: {
+        householdId: household.id,
+        dataInicio: new Date(Date.UTC(2026, 0, 20)),
+        dataFim: new Date(Date.UTC(2026, 0, 20)),
+        deId: gabi.id,
+        paraId: isa.id,
+        valorCentavos: 100_000,
+      },
+    });
+
+    const resultado = await buscarControlePagamento(prismaTest, household.id, {
+      dataInicio: new Date(Date.UTC(2026, 0, 1)),
+      dataFim: new Date(Date.UTC(2026, 0, 31)),
+    });
+
+    const gastoIsa = resultado.gastoTotal.find((g) => g.pessoaId === isa.id);
+    expect(gastoIsa?.porMes["2026-01"]).toBe(4_500 + 5_000);
+
+    const gastoGabi = resultado.gastoTotal.find((g) => g.pessoaId === gabi.id);
+    expect(gastoGabi?.porMes["2026-01"]).toBe(4_500);
+  });
+
   it("soma repasses tratando deId como pagador e paraId como divisão", async () => {
     const { household, isa, gabi } = await montarBase();
 

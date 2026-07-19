@@ -33,6 +33,16 @@ export type LinhaPagouPor = {
   porMes: Record<string, number>;
 };
 
+// "Gasto total" de uma pessoa INDIVIDUAL por mês, na MESMA regra do card
+// "Gastos totais" do dashboard (buscarSaldo/buscarLancamentosDoAno em
+// relatorios.ts): lançamentos cuja divisão é a própria pessoa, pelo valor
+// cheio, + a fração dela (peso / soma dos pesos, ver resolverFracaoPorGrupo)
+// nos lançamentos de grupos de que participa. Repasses não entram.
+export type LinhaGastoTotal = {
+  pessoaId: string;
+  porMes: Record<string, number>;
+};
+
 export type ControlePagamento = {
   // "AAAA-MM" em ordem crescente, cobrindo o período consultado
   meses: string[];
@@ -40,6 +50,7 @@ export type ControlePagamento = {
   pagadores: PessoaResumo[];
   linhas: LinhaControlePagamento[];
   pagouPor: LinhaPagouPor[];
+  gastoTotal: LinhaGastoTotal[];
 };
 
 function mesDe(data: Date): string {
@@ -146,8 +157,45 @@ export async function buscarControlePagamento(
     porMes.set(mes, (porMes.get(mes) ?? 0) + valor);
   }
 
+  // Fração de cada integrante em cada grupo (peso / soma dos pesos), a mesma
+  // conta de resolverFracaoPorGrupo em pessoas.ts — inclusive o arredondamento
+  // por lançamento (Math.round de valor e desconto separadamente), para o
+  // "Gasto total" daqui bater centavo a centavo com o dashboard.
+  const fracaoPorGrupoPessoa = new Map<string, number>();
+  for (const g of grupos) {
+    const somaPesos = g.integrantesDoGrupo.reduce((s, i) => s + i.peso, 0);
+    if (somaPesos <= 0) continue;
+    for (const i of g.integrantesDoGrupo) {
+      fracaoPorGrupoPessoa.set(`${g.id}::${i.pessoaId}`, i.peso / somaPesos);
+    }
+  }
+  const somaGastoTotal = new Map<string, Map<string, number>>();
+  function somarGastoTotal(pessoaId: string, mes: string, valor: number) {
+    if (valor === 0) return;
+    if (!somaGastoTotal.has(pessoaId)) somaGastoTotal.set(pessoaId, new Map());
+    const porMes = somaGastoTotal.get(pessoaId)!;
+    porMes.set(mes, (porMes.get(mes) ?? 0) + valor);
+  }
+
   for (const l of lancamentos) {
     somar(l.pessoaDivisaoId, l.pessoaPagouId, mesDe(l.data), valorLiquidoCentavos(l));
+
+    for (const pessoa of individuais) {
+      if (l.pessoaDivisaoId === pessoa.id) {
+        somarGastoTotal(pessoa.id, mesDe(l.data), valorLiquidoCentavos(l));
+        continue;
+      }
+      const fracao = fracaoPorGrupoPessoa.get(`${l.pessoaDivisaoId}::${pessoa.id}`);
+      if (fracao === undefined) continue;
+      somarGastoTotal(
+        pessoa.id,
+        mesDe(l.data),
+        valorLiquidoCentavos({
+          valorCentavos: Math.round(l.valorCentavos * fracao),
+          descontoCentavos: Math.round(l.descontoCentavos * fracao),
+        }),
+      );
+    }
 
     const tipo = l.pessoaDivisao.tipo;
     const valorLiquido = valorLiquidoCentavos(l);
@@ -214,5 +262,19 @@ export async function buscarControlePagamento(
     }
   }
 
-  return { meses, pessoasDivisao: pessoas, pagadores: individuais, linhas, pagouPor };
+  const gastoTotal: LinhaGastoTotal[] = individuais.map((pessoa) => {
+    const porMesSomado = somaGastoTotal.get(pessoa.id);
+    const porMes: Record<string, number> = {};
+    for (const mes of meses) porMes[mes] = porMesSomado?.get(mes) ?? 0;
+    return { pessoaId: pessoa.id, porMes };
+  });
+
+  return {
+    meses,
+    pessoasDivisao: pessoas,
+    pagadores: individuais,
+    linhas,
+    pagouPor,
+    gastoTotal,
+  };
 }

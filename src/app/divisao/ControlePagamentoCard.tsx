@@ -13,12 +13,17 @@ type LinhaPagouPor = {
   pagadorId: string;
   porMes: Record<string, number>;
 };
+type LinhaGastoTotal = {
+  pessoaId: string;
+  porMes: Record<string, number>;
+};
 type ControlePagamento = {
   meses: string[];
   pessoasDivisao: PessoaResumo[];
   pagadores: PessoaResumo[];
   linhas: LinhaControlePagamento[];
   pagouPor: LinhaPagouPor[];
+  gastoTotal: LinhaGastoTotal[];
 };
 
 const MESES_ABREVIADOS = [
@@ -84,14 +89,17 @@ export function ControlePagamentoCard({ reloadToken }: Props) {
     );
   }
 
+  // Mesma métrica do card "Gastos totais" do dashboard: gastos com divisão na
+  // própria pessoa + a fração dela nos grupos de que participa (gastoTotal
+  // vem pronto do backend — ver controlePagamento.ts).
   const gastosTotais = controle.pagadores.map((pagador) => ({
     label: `Gasto total ${pagador.nome}`,
     porMes: Object.fromEntries(
       controle!.meses.map((mes) => [
         mes,
-        controle!.linhas
-          .filter((l) => l.pagadorId === pagador.id)
-          .reduce((soma, l) => soma + (l.porMes[mes] ?? 0), 0),
+        controle!.gastoTotal.find((g) => g.pessoaId === pagador.id)?.porMes[
+          mes
+        ] ?? 0,
       ]),
     ),
   }));
