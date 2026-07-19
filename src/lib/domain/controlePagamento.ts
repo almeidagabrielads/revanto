@@ -1,5 +1,6 @@
 import type { PrismaClient } from "@/generated/prisma/client";
 import { valorLiquidoCentavos } from "./lancamentos";
+import { dividirPorPeso } from "./split";
 
 // ─── RF: Controle de pagamento ─────────────────────────────────────────────
 //
@@ -21,12 +22,24 @@ export type LinhaControlePagamento = {
   porMes: Record<string, number>;
 };
 
+// Quanto um pagador pagou "em nome de" outra pessoa INDIVIDUAL, por mês.
+// Além dos lançamentos cuja divisão é a própria pessoa, inclui a fatia dela
+// nos gastos de grupos (CASAL/FAMÍLIA) de que participa, rateada pelo peso de
+// cada integrante — a mesma regra do acerto de contas em split.ts.
+export type LinhaPagouPor = {
+  // pessoa INDIVIDUAL beneficiada
+  pessoaId: string;
+  pagadorId: string;
+  porMes: Record<string, number>;
+};
+
 export type ControlePagamento = {
   // "AAAA-MM" em ordem crescente, cobrindo o período consultado
   meses: string[];
   pessoasDivisao: PessoaResumo[];
   pagadores: PessoaResumo[];
   linhas: LinhaControlePagamento[];
+  pagouPor: LinhaPagouPor[];
 };
 
 function mesDe(data: Date): string {
@@ -49,7 +62,7 @@ export async function buscarControlePagamento(
   householdId: string,
   opts: { dataInicio?: Date; dataFim?: Date } = {},
 ): Promise<ControlePagamento> {
-  const [pessoas, individuais, lancamentos, repasses] = await Promise.all([
+  const [pessoas, individuais, grupos, lancamentos, repasses] = await Promise.all([
     prisma.pessoa.findMany({
       where: { householdId },
       orderBy: { nome: "asc" },
@@ -59,6 +72,13 @@ export async function buscarControlePagamento(
       where: { householdId, tipo: "INDIVIDUAL" },
       orderBy: { nome: "asc" },
       select: { id: true, nome: true },
+    }),
+    prisma.pessoa.findMany({
+      where: { householdId, tipo: { in: ["CASAL", "FAMILIA"] } },
+      select: {
+        id: true,
+        integrantesDoGrupo: { select: { pessoaId: true, peso: true } },
+      },
     }),
     prisma.lancamento.findMany({
       where: {
@@ -78,6 +98,7 @@ export async function buscarControlePagamento(
         descontoCentavos: true,
         pessoaDivisaoId: true,
         pessoaPagouId: true,
+        pessoaDivisao: { select: { tipo: true } },
       },
     }),
     prisma.acertoContas.findMany({
@@ -104,11 +125,53 @@ export async function buscarControlePagamento(
     porMes.set(mes, (porMes.get(mes) ?? 0) + valor);
   }
 
+  // Matriz "quanto A pagou pela B" (B sempre INDIVIDUAL): mesma regra de
+  // rateio do acerto de contas em split.ts — gasto de grupo é dividido pelo
+  // peso dos integrantes, e só a fatia de quem NÃO pagou conta como "pago
+  // pela outra pessoa". Divisão OUTRO e grupo sem integrantes ficam de fora.
+  const integrantesPorGrupo = new Map(
+    grupos.map((g) => [g.id, g.integrantesDoGrupo]),
+  );
+  const somaPagouPor = new Map<string, Map<string, number>>();
+  function somarPagouPor(
+    pessoaId: string,
+    pagadorId: string,
+    mes: string,
+    valor: number,
+  ) {
+    if (valor === 0) return;
+    const chave = `${pessoaId}::${pagadorId}`;
+    if (!somaPagouPor.has(chave)) somaPagouPor.set(chave, new Map());
+    const porMes = somaPagouPor.get(chave)!;
+    porMes.set(mes, (porMes.get(mes) ?? 0) + valor);
+  }
+
   for (const l of lancamentos) {
     somar(l.pessoaDivisaoId, l.pessoaPagouId, mesDe(l.data), valorLiquidoCentavos(l));
+
+    const tipo = l.pessoaDivisao.tipo;
+    const valorLiquido = valorLiquidoCentavos(l);
+    if (tipo === "INDIVIDUAL") {
+      if (l.pessoaDivisaoId !== l.pessoaPagouId) {
+        somarPagouPor(l.pessoaDivisaoId, l.pessoaPagouId, mesDe(l.data), valorLiquido);
+      }
+    } else if (tipo === "CASAL" || tipo === "FAMILIA") {
+      const integrantes = integrantesPorGrupo.get(l.pessoaDivisaoId) ?? [];
+      if (integrantes.length > 0) {
+        const partes = dividirPorPeso(
+          valorLiquido,
+          integrantes.map((i) => i.peso),
+        );
+        integrantes.forEach((integrante, idx) => {
+          if (integrante.pessoaId === l.pessoaPagouId) return;
+          somarPagouPor(integrante.pessoaId, l.pessoaPagouId, mesDe(l.data), partes[idx]);
+        });
+      }
+    }
   }
   for (const r of repasses) {
     somar(r.paraId, r.deId, mesDe(r.dataInicio), r.valorCentavos);
+    somarPagouPor(r.paraId, r.deId, mesDe(r.dataInicio), r.valorCentavos);
   }
 
   // Sem dataInicio/dataFim explícitos: acumulado de tudo — o intervalo de
@@ -140,5 +203,16 @@ export async function buscarControlePagamento(
     }
   }
 
-  return { meses, pessoasDivisao: pessoas, pagadores: individuais, linhas };
+  const pagouPor: LinhaPagouPor[] = [];
+  for (const pessoa of individuais) {
+    for (const pagador of individuais) {
+      if (pessoa.id === pagador.id) continue;
+      const porMesSomado = somaPagouPor.get(`${pessoa.id}::${pagador.id}`);
+      const porMes: Record<string, number> = {};
+      for (const mes of meses) porMes[mes] = porMesSomado?.get(mes) ?? 0;
+      pagouPor.push({ pessoaId: pessoa.id, pagadorId: pagador.id, porMes });
+    }
+  }
+
+  return { meses, pessoasDivisao: pessoas, pagadores: individuais, linhas, pagouPor };
 }

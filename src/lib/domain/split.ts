@@ -100,7 +100,7 @@ export type ResumoDivisaoGrupo = SaldoDivisaoGrupo & {
  * vão para as partes com maior resto fracionário (empate: primeiro índice).
  * Pesos iguais reproduzem uma divisão igualitária.
  */
-function dividirPorPeso(valorCentavos: number, pesos: number[]): number[] {
+export function dividirPorPeso(valorCentavos: number, pesos: number[]): number[] {
   const somaPesos = pesos.reduce((soma, peso) => soma + peso, 0);
   if (somaPesos <= 0) return pesos.map(() => 0);
 

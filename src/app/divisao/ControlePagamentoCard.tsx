@@ -8,11 +8,17 @@ type LinhaControlePagamento = {
   pagadorId: string;
   porMes: Record<string, number>;
 };
+type LinhaPagouPor = {
+  pessoaId: string;
+  pagadorId: string;
+  porMes: Record<string, number>;
+};
 type ControlePagamento = {
   meses: string[];
   pessoasDivisao: PessoaResumo[];
   pagadores: PessoaResumo[];
   linhas: LinhaControlePagamento[];
+  pagouPor: LinhaPagouPor[];
 };
 
 const MESES_ABREVIADOS = [
@@ -67,10 +73,13 @@ export function ControlePagamentoCard({ reloadToken }: Props) {
   const nomeDivisao = new Map(controle.pessoasDivisao.map((p) => [p.id, p.nome]));
   const nomePagador = new Map(controle.pagadores.map((p) => [p.id, p.nome]));
 
-  function valorDaLinha(divisaoId: string, pagadorId: string, mes: string): number {
+  // Inclui a fatia de cada pessoa nos gastos de grupos (Casal/Família) de que
+  // participa, além dos gastos individuais pagos pela outra — ver pagouPor no
+  // domínio (controlePagamento.ts).
+  function valorPagoPor(pessoaId: string, pagadorId: string, mes: string): number {
     return (
-      controle!.linhas.find(
-        (l) => l.divisaoId === divisaoId && l.pagadorId === pagadorId,
+      controle!.pagouPor.find(
+        (l) => l.pessoaId === pessoaId && l.pagadorId === pagadorId,
       )?.porMes[mes] ?? 0
     );
   }
@@ -96,10 +105,10 @@ export function ControlePagamentoCard({ reloadToken }: Props) {
 
   const linhasCruzadas = pares.flatMap(({ a, b }) => {
     const aPorB = Object.fromEntries(
-      controle!.meses.map((mes) => [mes, valorDaLinha(b.id, a.id, mes)]),
+      controle!.meses.map((mes) => [mes, valorPagoPor(b.id, a.id, mes)]),
     );
     const bPorA = Object.fromEntries(
-      controle!.meses.map((mes) => [mes, valorDaLinha(a.id, b.id, mes)]),
+      controle!.meses.map((mes) => [mes, valorPagoPor(a.id, b.id, mes)]),
     );
     const diferenca = Object.fromEntries(
       controle!.meses.map((mes) => [mes, aPorB[mes] - bPorA[mes]]),

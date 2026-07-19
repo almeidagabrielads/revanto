@@ -101,6 +101,59 @@ describe("buscarControlePagamento", () => {
     expect(gabiPorIsa?.porMes["2026-02"]).toBe(0);
   });
 
+  it("pagouPor inclui a fatia da outra pessoa nos gastos de grupo, rateada por peso", async () => {
+    const { household, isa, gabi, familia, categoria, banco } = await montarBase();
+    await prismaTest.integranteGrupo.createMany({
+      data: [
+        { grupoId: familia.id, pessoaId: isa.id, peso: 1, householdId: household.id },
+        { grupoId: familia.id, pessoaId: gabi.id, peso: 1, householdId: household.id },
+      ],
+    });
+
+    // Gabi paga R$ 90,00 líquidos da Família (metade da Isa: R$ 45,00)
+    await prismaTest.lancamento.create({
+      data: {
+        data: new Date(Date.UTC(2026, 0, 10)),
+        valorCentavos: 10_000,
+        descontoCentavos: 1_000,
+        householdId: household.id,
+        categoriaId: categoria.id,
+        bancoId: banco.id,
+        pessoaDivisaoId: familia.id,
+        pessoaPagouId: gabi.id,
+      },
+    });
+    // Gabi também paga R$ 50,00 de um gasto individual da Isa
+    await prismaTest.lancamento.create({
+      data: {
+        data: new Date(Date.UTC(2026, 0, 12)),
+        valorCentavos: 5_000,
+        householdId: household.id,
+        categoriaId: categoria.id,
+        bancoId: banco.id,
+        pessoaDivisaoId: isa.id,
+        pessoaPagouId: gabi.id,
+      },
+    });
+
+    const resultado = await buscarControlePagamento(prismaTest, household.id, {
+      dataInicio: new Date(Date.UTC(2026, 0, 1)),
+      dataFim: new Date(Date.UTC(2026, 0, 31)),
+    });
+
+    const gabiPelaIsa = resultado.pagouPor.find(
+      (l) => l.pessoaId === isa.id && l.pagadorId === gabi.id,
+    );
+    expect(gabiPelaIsa?.porMes["2026-01"]).toBe(4_500 + 5_000);
+
+    // A própria fatia da Gabi no grupo não conta como "pago pela Isa" nem
+    // aparece na direção inversa
+    const isaPelaGabi = resultado.pagouPor.find(
+      (l) => l.pessoaId === gabi.id && l.pagadorId === isa.id,
+    );
+    expect(isaPelaGabi?.porMes["2026-01"]).toBe(0);
+  });
+
   it("soma repasses tratando deId como pagador e paraId como divisão", async () => {
     const { household, isa, gabi } = await montarBase();
 
