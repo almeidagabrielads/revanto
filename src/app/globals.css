@@ -3,53 +3,53 @@
 /* Protótipos são light-only — dark: só ativa via classe .dark, nunca por prefers-color-scheme */
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* Design system — Revanto Identidade Visual (vinho / ocrê / terrosa; Playfair Display + Poppins) */
+/* Design system — Revanto Identidade Visual (navy / dourado / teal; Outfit + Inter) */
 @theme {
-  --font-sans: var(--font-poppins);
-  --font-display: var(--font-playfair);
+  --font-sans: var(--font-inter);
+  --font-display: var(--font-outfit);
 
-  /* Primária — Vinho */
-  --color-primary: #722f1f;
+  /* Primária — Azul profundo (navy) */
+  --color-primary: #2e5090;
   --color-on-primary: #ffffff;
-  --color-primary-container: #8b3a28;
-  --color-on-primary-container: #e8c5a0;
+  --color-primary-container: #d8e2f3;
+  --color-on-primary-container: #1b3568;
 
-  /* Secundária — Ocrê */
-  --color-secondary: #b28c5d;
+  /* Secundária — Dourado (só acentos pontuais: badges, ícones, destaques — nunca áreas grandes) */
+  --color-secondary: #ca8a04;
   --color-on-secondary: #ffffff;
-  --color-secondary-container: #d4a574;
-  --color-on-secondary-container: #4e3a21;
+  --color-secondary-container: #f7e7c4;
+  --color-on-secondary-container: #6b4a02;
 
-  /* Terciária — Terrosa */
-  --color-tertiary: #a68a6f;
+  /* Terciária — Teal */
+  --color-tertiary: #0e7490;
   --color-on-tertiary: #ffffff;
-  --color-tertiary-container: #6b4f2e;
-  --color-on-tertiary-container: #d4a574;
+  --color-tertiary-container: #cbe7ef;
+  --color-on-tertiary-container: #0a4a5c;
 
-  /* Status — tons suaves, sem cores "alerta" vivas */
-  --color-success: #3e7a4f;
+  /* Status — tons controlados, sem cores "alerta" vivas */
+  --color-success: #15803d;
   --color-on-success: #ffffff;
-  --color-danger: #a84632;
+  --color-danger: #b42318;
   --color-on-danger: #ffffff;
-  --color-danger-container: #f7ded6;
-  --color-on-danger-container: #7c2d1c;
+  --color-danger-container: #fbe4e1;
+  --color-on-danger-container: #7a231b;
 
-  /* Neutros & Fundos */
-  --color-background: #fefaf5;
-  --color-on-background: #3d2817;
-  --color-surface: #fefaf5;
-  --color-surface-dim: #eddfce;
-  --color-surface-bright: #fefaf5;
+  /* Neutros & Fundos (slate frio) */
+  --color-background: #f8fafc;
+  --color-on-background: #1f2937;
+  --color-surface: #f8fafc;
+  --color-surface-dim: #d8dfea;
+  --color-surface-bright: #ffffff;
   --color-surface-container-lowest: #ffffff;
-  --color-surface-container-low: #fbf5ed;
-  --color-surface-container: #f7eee3;
-  --color-surface-container-high: #f2e7d8;
-  --color-surface-container-highest: #ecdfcc;
-  --color-on-surface: #3d2817;
-  --color-on-surface-variant: #7b6b65;
+  --color-surface-container-low: #f1f5f9;
+  --color-surface-container: #e9eef5;
+  --color-surface-container-high: #e2e8f0;
+  --color-surface-container-highest: #dbe3ec;
+  --color-on-surface: #1f2937;
+  --color-on-surface-variant: #64748b;
 
-  --color-outline: #a89d94;
-  --color-outline-variant: #e9ded2;
+  --color-outline: #94a3b8;
+  --color-outline-variant: #e2e8f0;
 
   /* Border-radius mínimo 8px (elementos pequenos), 12px+ para cards */
   --radius-sm: 0.5rem;
@@ -71,18 +71,18 @@ body {
   color: var(--color-on-surface);
 }
 
-/* Headlines em Playfair Display (serif) — corpo permanece em Poppins */
+/* Headlines em Outfit (display) — corpo permanece em Inter */
 h1,
 h2 {
   font-family: var(--font-display);
 }
 
-/* CTAs primários: gradient vinho + sombra leve (guia Revanto) */
+/* CTAs primários: gradient navy sutil + sombra leve (guia Revanto) */
 button.bg-primary,
 a.bg-primary,
 input[type="submit"].bg-primary {
-  background-image: linear-gradient(135deg, #8b3a28 0%, #722f1f 100%);
-  box-shadow: 0 4px 12px rgba(114, 47, 31, 0.25);
+  background-image: linear-gradient(135deg, #355aa0 0%, #2e5090 100%);
+  box-shadow: 0 4px 12px rgba(46, 80, 144, 0.25);
 }
 
 /* Financial values: monospaced numeral alignment (RF — data-tabular role) */
@@ -94,7 +94,7 @@ input[type="submit"].bg-primary {
 /* Calculadora lateral: modo "selecionar valor da tela" (ver CalculadoraLateral.tsx) */
 .calc-selecionando .data-tabular {
   cursor: pointer;
-  outline: 2px dashed var(--color-secondary);
+  outline: 2px dashed var(--color-tertiary);
   outline-offset: 2px;
   border-radius: 8px;
 }

@@ -11,9 +11,9 @@ const TIPOS_INVESTIMENTO = [
   {
     value: "FUNDO",
     label: "Fundo de Investimento",
-    cor: "var(--color-secondary)",
+    cor: "#0891b2",
   },
-  { value: "FGTS", label: "FGTS", cor: "var(--color-tertiary-container)" },
+  { value: "FGTS", label: "FGTS", cor: "var(--color-tertiary)" },
   { value: "OUTRO", label: "Outro", cor: "var(--color-outline)" },
 ] as const;
 
@@ -22,9 +22,9 @@ const TIPOS_INVESTIMENTO = [
 // bucket "Outros" — nunca geramos uma nova cor além destas.
 const PALETTE_CATEGORICA = [
   "var(--color-primary)",
+  "#0891b2",
+  "var(--color-tertiary)",
   "var(--color-secondary)",
-  "var(--color-tertiary-container)",
-  "var(--color-on-tertiary-container)",
 ];
 const COR_OUTROS = "var(--color-outline)";
 
