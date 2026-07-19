@@ -31,6 +31,8 @@ type LinhaResumo = {
   porMes: Record<string, number>;
   destaque?: boolean;
   diferenca?: boolean;
+  pessoaA?: string;
+  pessoaB?: string;
 };
 
 const MESES_ABREVIADOS = [
@@ -58,6 +60,17 @@ function centavosParaReais(valor: number): string {
     style: "currency",
     currency: "BRL",
   });
+}
+
+function textoDiferenca(
+  valor: number,
+  pessoaA: string,
+  pessoaB: string,
+): string {
+  if (valor === 0) return "Quitado";
+  return valor > 0
+    ? `${pessoaB} deve ${centavosParaReais(valor)}`
+    : `${pessoaA} deve ${centavosParaReais(-valor)}`;
 }
 
 function mesAtual(): string {
@@ -155,6 +168,8 @@ export function ControlePagamentoCard({ reloadToken }: Props) {
           pares.length > 1 ? `Diferença (${a.nome} vs ${b.nome})` : "Diferença",
         porMes: diferenca,
         diferenca: true,
+        pessoaA: a.nome,
+        pessoaB: b.nome,
       },
     ];
   });
@@ -276,7 +291,19 @@ export function ControlePagamentoCard({ reloadToken }: Props) {
                             : ""
                         }`}
                       >
-                        {linha.porMes[mes] === 0 ? (
+                        {linha.diferenca && linha.pessoaA && linha.pessoaB ? (
+                          linha.porMes[mes] === 0 ? (
+                            <span className="text-on-secondary-container/70 font-normal">
+                              Quitado
+                            </span>
+                          ) : (
+                            textoDiferenca(
+                              linha.porMes[mes],
+                              linha.pessoaA,
+                              linha.pessoaB,
+                            )
+                          )
+                        ) : linha.porMes[mes] === 0 ? (
                           <span className="text-on-surface-variant">
                             {centavosParaReais(0)}
                           </span>
