@@ -72,7 +72,8 @@ export function ExportarDadosClient() {
         setPessoas(pes);
       })
       .catch(() => {
-        if (!cancelado) setErro("Não foi possível carregar os dados para exportação.");
+        if (!cancelado)
+          setErro("Não foi possível carregar os dados para exportação.");
       });
     return () => {
       cancelado = true;
@@ -89,7 +90,8 @@ export function ExportarDadosClient() {
     return {
       banco: (id: string) => mapaBancos.get(id) ?? "",
       pessoa: (id: string) => mapaPessoas.get(id) ?? "",
-      categoria: (id: string | null) => (id ? (mapaCategorias.get(id) ?? "") : ""),
+      categoria: (id: string | null) =>
+        id ? (mapaCategorias.get(id) ?? "") : "",
       subcategoria: (id: string | null) =>
         id ? (mapaSubcategorias.get(id) ?? "") : "",
     };
@@ -143,19 +145,19 @@ export function ExportarDadosClient() {
   }
 
   return (
-    <div className="flex flex-col gap-lg">
+    <div className="gap-lg flex flex-col">
       {erro && (
-        <p className="rounded-lg border border-danger/30 bg-danger-container p-sm text-sm text-on-danger-container">
+        <p className="border-danger/30 bg-danger-container p-sm text-on-danger-container rounded-lg border text-sm">
           {erro}
         </p>
       )}
 
-      <div className="flex flex-col gap-md rounded-xl border border-outline-variant bg-surface-container-lowest p-lg">
+      <div className="gap-md border-outline-variant bg-surface-container-lowest p-lg flex flex-col rounded-xl border">
         <div>
-          <h2 className="text-base font-semibold text-on-surface">
+          <h2 className="text-on-surface text-xl font-semibold">
             Exportar transações
           </h2>
-          <p className="text-sm text-on-surface-variant">
+          <p className="text-on-surface-variant text-sm">
             Baixe o histórico completo de lançamentos em formato compatível com
             planilhas (CSV).
           </p>
@@ -163,7 +165,7 @@ export function ExportarDadosClient() {
         <button
           onClick={exportarCsv}
           disabled={!lancamentos}
-          className="w-fit rounded-full bg-primary px-md py-1.5 text-xs font-semibold text-on-primary hover:opacity-90 disabled:opacity-50"
+          className="bg-primary px-md text-on-primary w-fit rounded-full py-1.5 text-xs font-semibold hover:opacity-90 disabled:opacity-50"
         >
           {lancamentos
             ? `Baixar CSV (${lancamentos.length} lançamentos)`

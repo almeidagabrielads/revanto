@@ -327,7 +327,7 @@ export function CalculadoraLateral() {
           className="border-outline-variant bg-surface-container-lowest fixed top-16 right-0 bottom-0 z-[90] flex w-full max-w-[22rem] flex-col overflow-y-auto border-l shadow-lg sm:max-w-[26rem]"
         >
           <div className="border-outline-variant p-md flex items-center justify-between border-b">
-            <h2 className="text-on-surface text-base font-bold">Calculadora</h2>
+            <h2 className="text-on-surface text-xl font-bold">Calculadora</h2>
             <button
               type="button"
               onClick={fechar}

@@ -294,7 +294,7 @@ export function RelatoriosClient() {
 
       <div className="gap-md grid grid-cols-1 lg:grid-cols-3">
         <div className="gap-sm flex flex-col lg:col-span-1">
-          <h2 className="text-on-surface-variant text-sm font-semibold tracking-wide uppercase">
+          <h2 className="text-on-surface-variant font-sans text-sm font-semibold tracking-wide uppercase">
             Tipos de relatórios
           </h2>
           {TIPOS.map((t) => (
@@ -479,7 +479,7 @@ export function RelatoriosClient() {
 
       {filtrosAbertos && (
         <div className="gap-md border-outline-variant bg-surface-container-lowest p-lg flex flex-col rounded-xl border">
-          <h2 className="text-on-surface text-base font-semibold">
+          <h2 className="text-on-surface text-xl font-semibold">
             Relatório personalizado
           </h2>
           <div className="gap-lg flex flex-wrap">
@@ -598,7 +598,7 @@ export function RelatoriosClient() {
       )}
 
       <section className="gap-sm flex flex-col">
-        <h2 className="text-on-surface-variant text-sm font-semibold tracking-wide uppercase">
+        <h2 className="text-on-surface-variant font-sans text-sm font-semibold tracking-wide uppercase">
           Relatórios completos
         </h2>
         <div className="gap-md grid grid-cols-1 sm:grid-cols-3">

@@ -66,17 +66,19 @@ export function SettingsShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
 
   return (
-    <main className="mx-auto flex w-full max-w-5xl flex-col gap-lg p-lg">
+    <main className="gap-lg p-lg mx-auto flex w-full max-w-5xl flex-col">
       <div>
-        <h1 className="text-2xl font-bold text-on-surface">Configurações do Sistema</h1>
-        <p className="text-sm text-on-surface-variant">
+        <h1 className="text-on-surface text-4xl font-bold">
+          Configurações do Sistema
+        </h1>
+        <p className="text-on-surface-variant text-sm">
           Gerencie o acesso, preferências e estrutura da sua vida financeira
           compartilhada.
         </p>
       </div>
 
-      <div className="flex flex-col gap-lg rounded-xl border border-outline-variant bg-surface-container-lowest sm:flex-row">
-        <nav className="flex shrink-0 flex-row gap-1 overflow-x-auto p-md sm:w-64 sm:flex-col sm:overflow-visible sm:border-r sm:border-outline-variant">
+      <div className="gap-lg border-outline-variant bg-surface-container-lowest flex flex-col rounded-xl border sm:flex-row">
+        <nav className="p-md sm:border-outline-variant flex shrink-0 flex-row gap-1 overflow-x-auto sm:w-64 sm:flex-col sm:overflow-visible sm:border-r">
           {ITENS.map((item) => {
             const ativo = pathname.startsWith(item.href);
             return (
@@ -85,8 +87,8 @@ export function SettingsShell({ children }: { children: ReactNode }) {
                 href={item.href}
                 className={
                   ativo
-                    ? "flex items-center gap-2 whitespace-nowrap rounded-lg bg-primary/10 px-md py-2 text-sm font-semibold text-primary"
-                    : "flex items-center gap-2 whitespace-nowrap rounded-lg px-md py-2 text-sm text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface"
+                    ? "bg-primary/10 px-md text-primary flex items-center gap-2 rounded-lg py-2 text-sm font-semibold whitespace-nowrap"
+                    : "px-md text-on-surface-variant hover:bg-surface-container hover:text-on-surface flex items-center gap-2 rounded-lg py-2 text-sm whitespace-nowrap transition-colors"
                 }
               >
                 <svg
@@ -106,7 +108,7 @@ export function SettingsShell({ children }: { children: ReactNode }) {
           })}
         </nav>
 
-        <div className="flex-1 p-lg">{children}</div>
+        <div className="p-lg flex-1">{children}</div>
       </div>
     </main>
   );

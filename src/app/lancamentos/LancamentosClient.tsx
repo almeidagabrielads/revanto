@@ -55,8 +55,7 @@ const MODOS_PARCELAMENTO = [
   {
     value: "PREVISAO",
     label: "Previsão",
-    descricao:
-      "Já lança todas as parcelas futuras, comprometendo o orçamento.",
+    descricao: "Já lança todas as parcelas futuras, comprometendo o orçamento.",
   },
 ] as const;
 
@@ -219,8 +218,7 @@ export function LancamentosClient() {
   const [erro, setErro] = useState<string | null>(null);
   const [naoAutenticado, setNaoAutenticado] = useState(false);
   const [reloadToken, setReloadToken] = useState(0);
-  const [reloadPainelParcelamentos, setReloadPainelParcelamentos] =
-    useState(0);
+  const [reloadPainelParcelamentos, setReloadPainelParcelamentos] = useState(0);
   const [modoParcelamentoPadrao, setModoParcelamentoPadrao] =
     useState("GRADUAL");
   const [toast, setToast] = useState<string | null>(null);
@@ -941,7 +939,7 @@ export function LancamentosClient() {
       {dialogConfirmacao}
 
       <div className="gap-sm flex items-center justify-between">
-        <h1 className="text-on-surface text-2xl font-bold">Lançamentos</h1>
+        <h1 className="text-on-surface text-4xl font-bold">Lançamentos</h1>
         <div className="flex gap-2">
           <ParcelamentosPanel
             onAlterado={carregar}
@@ -1019,7 +1017,7 @@ export function LancamentosClient() {
             className="gap-sm border-outline-variant bg-surface-container-lowest p-lg flex max-h-[85vh] w-full max-w-2xl flex-col overflow-y-auto rounded-2xl border shadow-lg"
           >
             <div className="flex items-center justify-between">
-              <h2 className="text-on-surface flex items-center gap-1.5 text-lg font-bold">
+              <h2 className="text-on-surface flex items-center gap-1.5 text-2xl font-bold">
                 Novo Lançamento
               </h2>
               <button
@@ -1303,7 +1301,7 @@ export function LancamentosClient() {
                       />
                     </div>
                   </div>
-                  <ul className="text-on-surface-variant gap-0.5 flex flex-col text-xs">
+                  <ul className="text-on-surface-variant flex flex-col gap-0.5 text-xs">
                     {MODOS_PARCELAMENTO.map((m) => (
                       <li key={m.value}>
                         <strong>{m.label}:</strong> {m.descricao}
@@ -1379,7 +1377,7 @@ export function LancamentosClient() {
       {modalImportarAberto && (
         <div className="bg-surface-container-lowest fixed inset-0 z-[100] flex flex-col">
           <div className="border-outline-variant p-lg flex items-center justify-between border-b">
-            <h2 className="text-on-surface flex items-center gap-1.5 text-lg font-bold">
+            <h2 className="text-on-surface flex items-center gap-1.5 text-2xl font-bold">
               {etapaImportacao === "revisar"
                 ? "Revisão de Importações"
                 : "Importar Extrato"}
@@ -1822,7 +1820,7 @@ export function LancamentosClient() {
                                 </span>
                               )}
                               {linha.parcelaDetectada && (
-                                <div className="bg-tertiary-container/10 border-tertiary-container/30 p-1.5 mt-1 flex flex-col gap-1 rounded-lg border">
+                                <div className="bg-tertiary-container/10 border-tertiary-container/30 mt-1 flex flex-col gap-1 rounded-lg border p-1.5">
                                   <label className="text-tertiary-container flex items-start gap-1.5 text-xs">
                                     <input
                                       type="checkbox"
@@ -2543,7 +2541,7 @@ function DetalheLancamentoDrawer({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between">
-          <h2 className="text-on-surface text-lg font-bold">
+          <h2 className="text-on-surface text-2xl font-bold">
             Detalhes do lançamento
           </h2>
           <button

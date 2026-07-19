@@ -2,8 +2,10 @@ import { ImportacaoClient } from "./ImportacaoClient";
 
 export default function ImportacaoPage() {
   return (
-    <main className="mx-auto flex w-full max-w-5xl flex-col gap-lg p-lg">
-      <h1 className="text-2xl font-bold text-on-surface">Importar extrato/fatura</h1>
+    <main className="gap-lg p-lg mx-auto flex w-full max-w-5xl flex-col">
+      <h1 className="text-on-surface text-4xl font-bold">
+        Importar extrato/fatura
+      </h1>
       <ImportacaoClient />
     </main>
   );

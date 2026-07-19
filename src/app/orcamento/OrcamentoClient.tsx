@@ -219,7 +219,6 @@ export function OrcamentoClient() {
     };
   }, []);
 
-
   if (naoAutenticado) {
     return (
       <p className="text-on-surface-variant">
@@ -248,7 +247,7 @@ export function OrcamentoClient() {
       )}
 
       {aba !== "mes" && (
-        <h1 className="text-on-surface text-2xl font-bold">Orçamento</h1>
+        <h1 className="text-on-surface text-4xl font-bold">Orçamento</h1>
       )}
 
       <div className="border-outline-variant flex gap-1 border-b">
@@ -285,8 +284,8 @@ export function OrcamentoClient() {
           />
           {!editavel && (
             <span className="text-on-surface-variant text-xs">
-              Somatório dos integrantes — somente leitura. Selecione uma
-              pessoa para editar.
+              Somatório dos integrantes — somente leitura. Selecione uma pessoa
+              para editar.
             </span>
           )}
         </div>
@@ -487,9 +486,7 @@ function VisaoMesAtual({
               valorTotalCentavos: p.valorTotalCentavos,
               quantidadeParcelas: p.quantidadeParcelas,
               dataPrimeiraParcela: new Date(p.dataPrimeiraParcela),
-              numerosParcelaLancados: p.lancamentos.map(
-                (l) => l.numeroParcela,
-              ),
+              numerosParcelaLancados: p.lancamentos.map((l) => l.numeroParcela),
             })),
         );
       })
@@ -755,7 +752,7 @@ function VisaoMesAtual({
     <div className="gap-lg flex flex-col">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-on-surface text-2xl font-bold">
+          <h1 className="text-on-surface text-4xl font-bold">
             Planejamento vs. Real
           </h1>
           <p className="text-on-surface-variant text-sm">
@@ -980,7 +977,7 @@ function VisaoMesAtual({
 
       <div className="gap-lg grid grid-cols-1 lg:grid-cols-2">
         <div className={cardClass}>
-          <h2 className="text-on-surface flex items-center gap-2 text-base font-semibold">
+          <h2 className="text-on-surface flex items-center gap-2 text-xl font-semibold">
             ✨ Insights do mês
           </h2>
           <p className="text-on-surface-variant text-sm">
@@ -1008,7 +1005,7 @@ function VisaoMesAtual({
 
         {insightComprometido && (
           <div className={cardClass}>
-            <h2 className="text-on-surface flex items-center gap-2 text-base font-semibold">
+            <h2 className="text-on-surface flex items-center gap-2 text-xl font-semibold">
               📌 Saldo comprometido
             </h2>
             <p className="text-on-surface-variant text-sm">
@@ -1100,9 +1097,7 @@ function CampoOrcamento({
   const [valorTexto, setValorTexto] = useState(
     valorCentavos > 0 || temRegistro ? (valorCentavos / 100).toFixed(2) : "",
   );
-  const [divisaoSelecionada, setDivisaoSelecionada] = useState(
-    divisaoId ?? "",
-  );
+  const [divisaoSelecionada, setDivisaoSelecionada] = useState(divisaoId ?? "");
   const [tipoSelecionado, setTipoSelecionado] = useState(tipoGasto);
 
   return (
@@ -1172,13 +1167,11 @@ function CampoOrcamentoCompacto({
   const [valorTexto, setValorTexto] = useState(
     valorCentavos > 0 || temRegistro ? (valorCentavos / 100).toFixed(2) : "",
   );
-  const [divisaoSelecionada, setDivisaoSelecionada] = useState(
-    divisaoId ?? "",
-  );
+  const [divisaoSelecionada, setDivisaoSelecionada] = useState(divisaoId ?? "");
   const [tipoSelecionado, setTipoSelecionado] = useState(tipoGasto);
 
   return (
-    <div className="gap-1 flex flex-col items-stretch">
+    <div className="flex flex-col items-stretch gap-1">
       <input
         type="number"
         step="0.01"

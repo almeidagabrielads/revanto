@@ -35,7 +35,7 @@ export function useConfirmDialog() {
   const dialog = pendente ? (
     <div className="bg-on-surface/40 p-lg fixed inset-0 z-[110] flex items-center justify-center">
       <div className="gap-md border-outline-variant bg-surface-container-lowest p-lg flex w-full max-w-[24rem] flex-col rounded-2xl border shadow-lg">
-        <h2 className="text-on-surface text-base font-bold">
+        <h2 className="text-on-surface text-xl font-bold">
           {pendente.title ?? "Confirmar ação"}
         </h2>
         <p className="text-on-surface-variant text-sm">{pendente.message}</p>

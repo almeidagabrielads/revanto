@@ -766,7 +766,7 @@ export function ReceitasClient() {
 
       <div className="gap-md flex flex-wrap items-start justify-between">
         <div>
-          <h1 className="text-on-surface text-2xl font-bold">Receitas</h1>
+          <h1 className="text-on-surface text-4xl font-bold">Receitas</h1>
           <p className="text-on-surface-variant text-sm">
             Salários, vouchers e outras entradas por pessoa e mês. Gestão
             colaborativa para o nosso lar.
@@ -793,7 +793,7 @@ export function ReceitasClient() {
       </div>
 
       <div className={`${cardClass} p-lg`}>
-        <h2 className="mb-md text-on-surface text-base font-bold">
+        <h2 className="mb-md text-on-surface text-xl font-bold">
           Total por Pessoa e Mês ({ano})
         </h2>
         {pessoas.length > 0 && receitas ? (
@@ -811,7 +811,7 @@ export function ReceitasClient() {
 
       <div className="gap-md flex flex-wrap items-center justify-between">
         <div className="gap-md flex items-center">
-          <h2 className="text-on-surface text-lg font-bold">
+          <h2 className="text-on-surface text-2xl font-bold">
             {modo === "mensal"
               ? `${NOMES_MES[mes - 1]} ${ano}`
               : `Ano de ${ano}`}
@@ -879,12 +879,12 @@ export function ReceitasClient() {
       </div>
 
       {modalAberto && (
-        <div className="p-lg fixed inset-0 z-[100] flex items-center justify-center bg-on-surface/40">
-          <div className="gap-md rounded-2xl border-outline-variant bg-surface-container-lowest p-lg flex w-full max-w-[36rem] flex-col border shadow-lg">
+        <div className="p-lg bg-on-surface/40 fixed inset-0 z-[100] flex items-center justify-center">
+          <div className="gap-md border-outline-variant bg-surface-container-lowest p-lg flex w-full max-w-[36rem] flex-col rounded-2xl border shadow-lg">
             <div className="border-outline-variant pb-md text-on-surface flex items-center justify-between gap-2 border-b">
               <div className="flex items-center gap-2">
                 <IconePlusCirculo />
-                <h2 className="text-base font-bold">Registrar Nova Entrada</h2>
+                <h2 className="text-xl font-bold">Registrar Nova Entrada</h2>
               </div>
               <button
                 type="button"
@@ -1005,7 +1005,7 @@ export function ReceitasClient() {
       <div className={cardClass}>
         <div className="gap-md p-lg pb-md flex flex-wrap items-center justify-between">
           <div className="flex items-center gap-2">
-            <h2 className="text-on-surface text-base font-bold">
+            <h2 className="text-on-surface text-xl font-bold">
               Extrato Detalhado
             </h2>
             <span className="bg-surface-container px-sm text-on-surface-variant rounded-full py-0.5 text-xs font-semibold">

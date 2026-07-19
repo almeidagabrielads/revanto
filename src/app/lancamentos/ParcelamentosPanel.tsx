@@ -246,7 +246,7 @@ export function ParcelamentosPanel({
             className="bg-surface-container-lowest p-lg gap-sm flex h-full w-full max-w-[28rem] flex-col overflow-y-auto shadow-lg"
           >
             <div className="flex items-center justify-between">
-              <h2 className="text-on-surface text-lg font-bold">
+              <h2 className="text-on-surface text-2xl font-bold">
                 Parcelamentos em aberto
               </h2>
               <button

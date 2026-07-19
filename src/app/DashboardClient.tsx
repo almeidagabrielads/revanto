@@ -59,7 +59,7 @@ export function DashboardClient() {
     <div className="gap-lg flex flex-col">
       <div className="gap-md flex flex-wrap items-center justify-between">
         <div className="gap-md flex items-center">
-          <h1 className="text-on-surface text-xl font-bold">
+          <h1 className="text-on-surface text-3xl font-bold">
             {modo === "mensal"
               ? `${NOMES_MES[mes - 1]} ${ano}`
               : `Ano de ${ano}`}

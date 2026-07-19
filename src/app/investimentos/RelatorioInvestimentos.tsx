@@ -196,7 +196,7 @@ function AlocacaoCard({
 }) {
   return (
     <section className="gap-md border-outline-variant bg-surface-container-lowest p-lg flex flex-col rounded-xl border shadow-sm">
-      <h2 className="text-on-surface text-base font-bold">{titulo}</h2>
+      <h2 className="text-on-surface text-xl font-bold">{titulo}</h2>
       {grupos.length > 0 ? (
         <>
           <div className="flex justify-center">
@@ -290,11 +290,10 @@ function GraficoRendimento({ linhas }: { linhas: LinhaRendimento[] }) {
     l.rendimentoAcumuladoRealPercentual,
     l.cdiAcumuladoPercentual,
   ]);
-  const {
-    ticks,
-    min,
-    max,
-  } = calcularTicksEixoY(Math.min(0, ...valores), Math.max(0, ...valores, 0.01));
+  const { ticks, min, max } = calcularTicksEixoY(
+    Math.min(0, ...valores),
+    Math.max(0, ...valores, 0.01),
+  );
 
   function coordenadas(
     chave: "rendimentoAcumuladoRealPercentual" | "cdiAcumuladoPercentual",
@@ -311,12 +310,16 @@ function GraficoRendimento({ linhas }: { linhas: LinhaRendimento[] }) {
     return { x, y };
   }
 
-  function pontos(chave: "rendimentoAcumuladoRealPercentual" | "cdiAcumuladoPercentual"): string {
+  function pontos(
+    chave: "rendimentoAcumuladoRealPercentual" | "cdiAcumuladoPercentual",
+  ): string {
     if (linhas.length === 1) {
       const { y } = coordenadas(chave, 0);
       return `${padLeft},${y} ${largura - padRight},${y}`;
     }
-    return linhas.map((_, i) => `${coordenadas(chave, i).x},${coordenadas(chave, i).y}`).join(" ");
+    return linhas
+      .map((_, i) => `${coordenadas(chave, i).x},${coordenadas(chave, i).y}`)
+      .join(" ");
   }
 
   function yDoValor(valor: number): number {
@@ -333,8 +336,7 @@ function GraficoRendimento({ linhas }: { linhas: LinhaRendimento[] }) {
     const rect = svg.getBoundingClientRect();
     const svgX = ((e.clientX - rect.left) / rect.width) * largura;
     const usableWidth = largura - padLeft - padRight;
-    const frac =
-      linhas.length === 1 ? 0 : (svgX - padLeft) / usableWidth;
+    const frac = linhas.length === 1 ? 0 : (svgX - padLeft) / usableWidth;
     const index = Math.min(
       linhas.length - 1,
       Math.max(0, Math.round(frac * (linhas.length - 1))),
@@ -344,9 +346,13 @@ function GraficoRendimento({ linhas }: { linhas: LinhaRendimento[] }) {
 
   const linhaAtiva = hoverIndex !== null ? linhas[hoverIndex] : null;
   const pontoCarteira =
-    hoverIndex !== null ? coordenadas("rendimentoAcumuladoRealPercentual", hoverIndex) : null;
+    hoverIndex !== null
+      ? coordenadas("rendimentoAcumuladoRealPercentual", hoverIndex)
+      : null;
   const pontoCdi =
-    hoverIndex !== null ? coordenadas("cdiAcumuladoPercentual", hoverIndex) : null;
+    hoverIndex !== null
+      ? coordenadas("cdiAcumuladoPercentual", hoverIndex)
+      : null;
 
   const tooltipLeftPct = pontoCarteira
     ? Math.min(92, Math.max(8, (pontoCarteira.x / largura) * 100))
@@ -754,7 +760,7 @@ export function RelatorioInvestimentos({
 
         <section className="gap-md border-outline-variant bg-surface-container-lowest p-lg flex flex-col rounded-xl border shadow-sm">
           <div className="flex items-center justify-between">
-            <h2 className="text-on-surface text-base font-bold">
+            <h2 className="text-on-surface text-xl font-bold">
               Performance: Rendimento vs. CDI
             </h2>
             <div className="gap-md text-on-surface-variant flex items-center text-xs">
@@ -806,7 +812,7 @@ export function RelatorioInvestimentos({
       </div>
 
       <section className="gap-sm border-outline-variant bg-surface-container-lowest p-lg flex flex-col rounded-xl border shadow-sm">
-        <h2 className="text-on-surface text-base font-bold">
+        <h2 className="text-on-surface text-xl font-bold">
           Detalhamento por Classe
         </h2>
         <table className="min-w-full border-collapse text-sm">

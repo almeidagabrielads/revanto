@@ -4,12 +4,12 @@ import { ExportarDadosClient } from "./ExportarDadosClient";
 export default function ExportarDadosPage() {
   return (
     <SettingsShell>
-      <div className="flex flex-col gap-lg">
+      <div className="gap-lg flex flex-col">
         <div>
-          <h2 className="text-lg font-semibold text-on-surface">
+          <h2 className="text-on-surface text-2xl font-semibold">
             Exportar & Dados
           </h2>
-          <p className="text-sm text-on-surface-variant">
+          <p className="text-on-surface-variant text-sm">
             Gerencie a portabilidade dos seus dados.
           </p>
         </div>

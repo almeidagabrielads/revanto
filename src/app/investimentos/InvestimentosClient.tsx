@@ -458,7 +458,7 @@ export function InvestimentosClient() {
         <div className={cardClass}>
           <div className="gap-md p-lg pb-md flex flex-wrap items-center justify-between">
             <div className="flex items-center gap-2">
-              <h2 className="text-on-surface text-base font-bold">Carteira</h2>
+              <h2 className="text-on-surface text-xl font-bold">Carteira</h2>
               <span className="bg-surface-container px-sm text-on-surface-variant rounded-full py-0.5 text-xs font-semibold">
                 {investimentos?.length ?? 0}{" "}
                 {investimentos?.length === 1

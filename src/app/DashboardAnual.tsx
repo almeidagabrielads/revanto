@@ -542,7 +542,7 @@ export function DashboardAnual({ ano }: { ano: number }) {
 
       {/* Saldo do ano anterior + saldo acumulado */}
       <div className={cardClass}>
-        <h2 className="text-on-surface text-base font-semibold">
+        <h2 className="text-on-surface text-xl font-semibold">
           Saldo do ano anterior ({ano - 1})
         </h2>
         {saldoAnoAnterior && !editandoSaldoAnterior ? (
@@ -642,7 +642,7 @@ export function DashboardAnual({ ano }: { ano: number }) {
       {/* Fluxo de caixa mensal + Maiores gastos */}
       <div className="gap-md grid grid-cols-1 lg:grid-cols-3">
         <div className={`${cardClass} lg:col-span-2`}>
-          <h2 className="text-on-surface text-base font-semibold">
+          <h2 className="text-on-surface text-xl font-semibold">
             Fluxo de caixa mensal
           </h2>
           <div className="flex h-48 items-end gap-2">
@@ -701,7 +701,7 @@ export function DashboardAnual({ ano }: { ano: number }) {
         </div>
 
         <div className={cardClass}>
-          <h2 className="text-on-surface text-base font-semibold">
+          <h2 className="text-on-surface text-xl font-semibold">
             Maiores gastos
           </h2>
           {maioresGastos.length > 0 ? (
@@ -738,7 +738,7 @@ export function DashboardAnual({ ano }: { ano: number }) {
       {/* Análise anual de despesas */}
       <div className="gap-md flex flex-col">
         <div>
-          <h2 className="text-on-surface text-xl font-bold">
+          <h2 className="text-on-surface text-3xl font-bold">
             Análise anual de despesas
           </h2>
           <p className="text-on-surface-variant text-sm">

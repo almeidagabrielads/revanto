@@ -4,12 +4,12 @@ import { PreferenciasClient } from "./PreferenciasClient";
 export default function PreferenciasPage() {
   return (
     <SettingsShell>
-      <div className="flex flex-col gap-lg">
+      <div className="gap-lg flex flex-col">
         <div>
-          <h2 className="text-lg font-semibold text-on-surface">
+          <h2 className="text-on-surface text-2xl font-semibold">
             Preferências
           </h2>
-          <p className="text-sm text-on-surface-variant">
+          <p className="text-on-surface-variant text-sm">
             Personalize sua experiência e configurações regionais.
           </p>
         </div>

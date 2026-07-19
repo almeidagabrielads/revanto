@@ -237,7 +237,7 @@ export function DashboardMensal({ ano, mes }: { ano: number; mes: number }) {
   const cardClass =
     "flex flex-col gap-md rounded-xl border border-outline-variant bg-surface-container-lowest p-lg shadow-sm";
   const cardTitleClass =
-    "text-xs font-semibold uppercase tracking-wide text-on-surface-variant";
+    "font-sans text-xs font-semibold uppercase tracking-wide text-on-surface-variant";
   const linkClass = "mt-auto text-sm font-medium text-primary hover:underline";
 
   return (
@@ -302,7 +302,7 @@ export function DashboardMensal({ ano, mes }: { ano: number; mes: number }) {
         </div>
 
         <div className="gap-md bg-primary p-lg text-on-primary flex flex-col justify-between rounded-xl shadow-sm">
-          <h2 className="text-on-primary/70 text-center text-xs font-semibold tracking-wide uppercase">
+          <h2 className="text-on-primary/70 text-center font-sans text-xs font-semibold tracking-wide uppercase">
             Acerto de contas
           </h2>
           {!divisaoCarregada ? (

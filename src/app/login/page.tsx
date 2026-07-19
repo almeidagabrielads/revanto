@@ -19,7 +19,7 @@ export default function LoginPage() {
             <path d="M5 9.5V21h14V9.5" />
           </svg>
           <div>
-            <h1 className="text-2xl leading-tight font-bold">REVANTO</h1>
+            <h1 className="text-5xl leading-tight font-bold">Revanto</h1>
           </div>
         </div>
         <p className="text-on-primary/90 max-w-[28rem] text-base leading-relaxed">
@@ -32,10 +32,10 @@ export default function LoginPage() {
       <section className="bg-surface p-md lg:p-xl flex flex-1 items-center justify-center">
         <div className="space-y-lg w-full max-w-[28rem]">
           <div className="flex flex-col items-center gap-1 lg:hidden">
-            <h1 className="text-primary text-xl font-bold">REVANTO</h1>
+            <h1 className="text-primary text-4xl font-bold">Revanto</h1>
           </div>
           <header className="space-y-xs">
-            <h2 className="text-on-surface text-2xl font-bold">
+            <h2 className="text-on-surface text-4xl font-bold">
               Bem-vindos de volta
             </h2>
             <p className="text-on-surface-variant text-sm">
