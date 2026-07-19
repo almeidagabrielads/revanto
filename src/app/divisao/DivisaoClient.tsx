@@ -3,10 +3,9 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { corPessoa } from "../components/PessoaBadge";
-import { ColumnHeader } from "../components/ColumnHeader";
 import { Select } from "../components/Select";
-import { useTabela, type ColunaTabela } from "../components/useTabela";
 import { RegistrarRepasseModal } from "./RegistrarRepasseModal";
+import { ControlePagamentoCard } from "./ControlePagamentoCard";
 
 export type Pessoa = { id: string; nome: string; tipo: string };
 type SaldoPessoa = { pessoaId: string; saldoCentavos: number };
@@ -66,18 +65,12 @@ function formatarDataISO(data: Date): string {
   return data.toISOString().slice(0, 10);
 }
 
-function primeiroDiaDoMes(): string {
-  const hoje = new Date();
-  return formatarDataISO(
-    new Date(Date.UTC(hoje.getUTCFullYear(), hoje.getUTCMonth(), 1)),
-  );
+function primeiroDiaDoAno(ano: number): string {
+  return formatarDataISO(new Date(Date.UTC(ano, 0, 1)));
 }
 
-function ultimoDiaDoMes(): string {
-  const hoje = new Date();
-  return formatarDataISO(
-    new Date(Date.UTC(hoje.getUTCFullYear(), hoje.getUTCMonth() + 1, 0)),
-  );
+function ultimoDiaDoAno(ano: number): string {
+  return formatarDataISO(new Date(Date.UTC(ano, 11, 31)));
 }
 
 function centavosParaReais(valor: number): string {
@@ -149,9 +142,12 @@ function IconeChecklist() {
   );
 }
 
+const ANO_ATUAL = new Date().getUTCFullYear();
+
 export function DivisaoClient() {
-  const [dataInicio, setDataInicio] = useState(primeiroDiaDoMes());
-  const [dataFim, setDataFim] = useState(ultimoDiaDoMes());
+  const [ano, setAno] = useState(ANO_ATUAL);
+  const dataInicio = primeiroDiaDoAno(ano);
+  const dataFim = ultimoDiaDoAno(ano);
   const [pessoas, setPessoas] = useState<Pessoa[]>([]);
   const [resumo, setResumo] = useState<Resumo | null>(null);
   const [historico, setHistorico] = useState<Acerto[]>([]);
@@ -160,8 +156,6 @@ export function DivisaoClient() {
   const [naoAutenticado, setNaoAutenticado] = useState(false);
   const [modalRepasseAberto, setModalRepasseAberto] = useState(false);
   const [repasseRegistrado, setRepasseRegistrado] = useState(false);
-  const [filtroPessoa, setFiltroPessoa] = useState("");
-  const [mostrarTodosLancamentos, setMostrarTodosLancamentos] = useState(false);
   const [mostrarHistoricoCompleto, setMostrarHistoricoCompleto] =
     useState(false);
   const [reloadToken, setReloadToken] = useState(0);
@@ -242,53 +236,6 @@ export function DivisaoClient() {
     setReloadToken((t) => t + 1);
   }
 
-  const lancamentosFiltrados =
-    resumo?.lancamentos.filter(
-      (l) => !filtroPessoa || l.pessoaDivisaoId === filtroPessoa,
-    ) ?? [];
-
-  const colunasLancamentos = useMemo<ColunaTabela<LancamentoDetalhe>[]>(
-    () => [
-      { chave: "descricao", tipo: "texto", acessor: (l) => l.descricao || "" },
-      {
-        chave: "responsavel",
-        tipo: "opcoes",
-        acessor: (l) => nome(l.pessoaDivisaoId),
-      },
-      {
-        chave: "categoria",
-        tipo: "opcoes",
-        acessor: (l) => l.categoriaNome ?? "Sem categoria",
-      },
-      { chave: "valor", tipo: "numero", acessor: (l) => l.valorCentavos / 100 },
-    ],
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [nomePorId],
-  );
-
-  const {
-    linhas: lancamentosProcessados,
-    ordenacao,
-    alternarOrdenacao,
-    filtros,
-    definirFiltro,
-    limparFiltro,
-  } = useTabela(lancamentosFiltrados, colunasLancamentos);
-
-  const opcoesColunasLancamentos = useMemo(() => {
-    const unicos = (valores: string[]) =>
-      [...new Set(valores)].sort((a, b) => a.localeCompare(b, "pt-BR"));
-    return {
-      responsavel: unicos(
-        lancamentosFiltrados.map((l) => nome(l.pessoaDivisaoId)),
-      ),
-      categoria: unicos(
-        lancamentosFiltrados.map((l) => l.categoriaNome ?? "Sem categoria"),
-      ),
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lancamentosFiltrados]);
-
   if (naoAutenticado) {
     return (
       <p className="text-on-surface-variant">
@@ -299,10 +246,6 @@ export function DivisaoClient() {
 
   const totalPagoGeral =
     resumo?.totalPagoPorPessoa.reduce((s, t) => s + t.totalCentavos, 0) ?? 0;
-
-  const lancamentosVisiveis = mostrarTodosLancamentos
-    ? lancamentosProcessados
-    : lancamentosProcessados.slice(0, 6);
 
   const historicoVisivel = mostrarHistoricoCompleto
     ? historico
@@ -317,59 +260,22 @@ export function DivisaoClient() {
       )}
 
       <div className="gap-md flex flex-wrap items-end justify-between">
-        <div className="gap-md flex flex-wrap items-end">
-          <div className="flex flex-col gap-1">
-            <label
-              className="text-on-surface-variant text-xs font-semibold"
-              htmlFor="dataInicio"
-            >
-              De
-            </label>
-            <input
-              id="dataInicio"
-              type="date"
-              className="border-outline-variant bg-surface-container-lowest rounded-lg border px-2 py-1"
-              value={dataInicio}
-              onChange={(e) => setDataInicio(e.target.value)}
-            />
-          </div>
-          <div className="flex flex-col gap-1">
-            <label
-              className="text-on-surface-variant text-xs font-semibold"
-              htmlFor="dataFim"
-            >
-              Até
-            </label>
-            <input
-              id="dataFim"
-              type="date"
-              className="border-outline-variant bg-surface-container-lowest rounded-lg border px-2 py-1"
-              value={dataFim}
-              onChange={(e) => setDataFim(e.target.value)}
-            />
-          </div>
-          {resumo && resumo.participantes.length > 0 && (
-            <div className="flex flex-col gap-1">
-              <label
-                className="text-on-surface-variant text-xs font-semibold"
-                htmlFor="filtroPessoa"
-              >
-                Filtrar por pessoa
-              </label>
-              <Select
-                id="filtroPessoa"
-                value={filtroPessoa}
-                onChange={setFiltroPessoa}
-                options={[
-                  { value: "", label: "Todos" },
-                  ...resumo.participantes.map((id) => ({
-                    value: id,
-                    label: nome(id),
-                  })),
-                ]}
-              />
-            </div>
-          )}
+        <div className="gap-sm flex items-center">
+          <label
+            className="text-on-surface-variant text-xs font-semibold"
+            htmlFor="ano-divisao"
+          >
+            Ano
+          </label>
+          <Select
+            id="ano-divisao"
+            value={String(ano)}
+            onChange={(v) => setAno(Number(v))}
+            options={[ANO_ATUAL, ANO_ATUAL - 1, ANO_ATUAL - 2].map((a) => ({
+              value: String(a),
+              label: String(a),
+            }))}
+          />
         </div>
 
         {resumo && resumo.participantes.length > 0 && (
@@ -432,44 +338,58 @@ export function DivisaoClient() {
       {resumo && (
         <>
           <div className="gap-md grid grid-cols-1 lg:grid-cols-3">
-            {resumo.participantes.map((id) => {
-              const pago =
-                resumo.totalPagoPorPessoa.find((t) => t.pessoaId === id)
-                  ?.totalCentavos ?? 0;
-              const percentual =
-                totalPagoGeral > 0 ? (pago / totalPagoGeral) * 100 : 0;
-              return (
-                <div
-                  key={id}
-                  className="gap-md border-outline-variant bg-surface-container-lowest p-lg flex flex-col rounded-xl border"
-                >
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={`flex h-9 w-9 items-center justify-center rounded-full text-sm font-bold ${corPessoa(id)}`}
-                    >
-                      {nome(id).charAt(0).toUpperCase()}
-                    </span>
-                    <h3 className="text-on-surface text-base font-semibold">
-                      {nome(id)}
-                    </h3>
-                  </div>
-                  <div>
-                    <p className="text-on-surface-variant text-xs">
-                      Pagou no total
-                    </p>
-                    <p className="text-on-surface text-2xl font-bold">
-                      {centavosParaReais(pago)}
-                    </p>
-                  </div>
-                  <div className="bg-surface-container h-1.5 w-full overflow-hidden rounded-full">
-                    <div
-                      className={`h-full rounded-full ${corBarra(id)}`}
-                      style={{ width: `${percentual}%` }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
+            <div className="gap-lg border-outline-variant bg-surface-container-lowest p-lg flex flex-col rounded-xl border lg:col-span-2">
+              <div className="gap-lg flex flex-col">
+                {resumo.participantes.map((id) => {
+                  const pago =
+                    resumo.totalPagoPorPessoa.find((t) => t.pessoaId === id)
+                      ?.totalCentavos ?? 0;
+                  const percentual =
+                    totalPagoGeral > 0 ? (pago / totalPagoGeral) * 100 : 0;
+                  return (
+                    <div key={id} className="gap-sm flex flex-col">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold ${corPessoa(id)}`}
+                          >
+                            {nome(id).charAt(0).toUpperCase()}
+                          </span>
+                          <div>
+                            <p className="text-on-surface text-sm font-semibold">
+                              {nome(id)}
+                            </p>
+                            <p className="text-on-surface-variant text-xs">
+                              Pagou no total
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-on-surface text-lg font-bold">
+                            {centavosParaReais(pago)}
+                          </p>
+                          <p className="text-on-surface-variant text-xs">
+                            {percentual.toFixed(1)}%
+                          </p>
+                        </div>
+                      </div>
+                      <div className="bg-surface-container h-1.5 w-full overflow-hidden rounded-full">
+                        <div
+                          className={`h-full rounded-full ${corBarra(id)}`}
+                          style={{ width: `${percentual}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              {resumo.insight && (
+                <p className="bg-surface-container-low p-sm text-on-surface-variant rounded-lg text-xs">
+                  Este período {nome(resumo.insight.pessoaId)} cobriu a maior
+                  parte das despesas em {resumo.insight.categoriaNome}.
+                </p>
+              )}
+            </div>
 
             <div className="bg-primary p-lg text-on-primary flex flex-col justify-center gap-2 rounded-xl lg:col-span-1">
               <h3 className="text-on-primary/70 text-center text-xs font-semibold tracking-wide uppercase">
@@ -477,12 +397,12 @@ export function DivisaoClient() {
               </h3>
               {resumo.transferenciasSugeridas.length === 0 ? (
                 <p className="text-center text-lg font-semibold">
-                  Contas quitadas 🎉
+                  Contas quitadas
                 </p>
               ) : (
-                <div className="flex flex-col gap-1 text-center">
+                <div className="mt-5 flex flex-col gap-1 text-center">
                   {resumo.transferenciasSugeridas.map((t, i) => (
-                    <p key={i} className="text-lg font-bold">
+                    <p key={i} className="mb-5 text-lg font-bold">
                       {nome(t.deId)} deve {centavosParaReais(t.valorCentavos)}{" "}
                       para {nome(t.paraId)}
                     </p>
@@ -495,117 +415,66 @@ export function DivisaoClient() {
             </div>
           </div>
 
-          <div className="gap-md grid grid-cols-1 lg:grid-cols-3">
-            <div className="border-outline-variant bg-surface-container-lowest p-lg flex flex-col gap-2 rounded-xl border lg:col-span-2">
+          <div className="lg:col-span-2">
+            <ControlePagamentoCard
+              dataInicio={dataInicio}
+              dataFim={dataFim}
+              reloadToken={reloadToken}
+            />
+          </div>
 
-              {lancamentosProcessados.length > 6 && (
+          <div className="gap-md flex flex-col">
+            <div className="border-outline-variant bg-surface-container-lowest p-lg flex flex-col gap-2 rounded-xl border">
+              <div className="flex items-center justify-between">
+                <h3 className="text-on-surface text-base font-semibold">
+                  Histórico de acertos
+                </h3>
+                <span className="text-on-surface-variant">
+                  <IconeHistorico />
+                </span>
+              </div>
+              {historico.length === 0 ? (
+                <p className="text-on-surface-variant text-sm">
+                  Nenhum acerto resolvido ainda.
+                </p>
+              ) : (
+                <ul className="flex flex-col gap-2">
+                  {historicoVisivel.map((a) => (
+                    <li
+                      key={a.id}
+                      className="border-primary flex items-center justify-between gap-2 border-l-2 pl-2"
+                    >
+                      <div>
+                        <p className="text-on-surface text-sm font-medium">
+                          {nome(a.de.id)} → {nome(a.para.id)} ·{" "}
+                          {nomeMes(a.dataInicio)}
+                        </p>
+                        <p className="text-on-surface-variant text-xs">
+                          Resolvido em {formatarDataCurta(a.resolvidoEm)}
+                        </p>
+                      </div>
+                      <div className="flex flex-col items-end gap-0.5">
+                        <span className="text-success text-sm font-semibold">
+                          {centavosParaReais(a.valorCentavos)}
+                        </span>
+                        <span className="bg-success/15 text-success rounded-full px-2 py-0.5 text-[10px] font-semibold">
+                          PAGO
+                        </span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {historico.length > 3 && (
                 <button
-                  onClick={() => setMostrarTodosLancamentos((v) => !v)}
-                  className="text-primary text-sm font-medium hover:underline"
+                  onClick={() => setMostrarHistoricoCompleto((v) => !v)}
+                  className="border-outline-variant text-on-surface-variant hover:bg-surface-container-low rounded-lg border py-1.5 text-sm font-medium"
                 >
-                  {mostrarTodosLancamentos
+                  {mostrarHistoricoCompleto
                     ? "Mostrar menos"
-                    : `Ver todas as ${lancamentosProcessados.length} despesas deste período`}
+                    : "Ver histórico completo"}
                 </button>
               )}
-              {lancamentosProcessados.length === 0 && (
-                <p className="text-on-surface-variant text-sm">
-                  {lancamentosFiltrados.length === 0
-                    ? "Nenhuma despesa considerada no acerto para este período."
-                    : "Nenhuma despesa corresponde aos filtros das colunas."}
-                </p>
-              )}
-            </div>
-
-            <div className="gap-md flex flex-col">
-              <div className="border-outline-variant bg-surface-container-lowest p-lg flex flex-col gap-2 rounded-xl border">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-on-surface text-base font-semibold">
-                    Histórico de acertos
-                  </h3>
-                  <span className="text-on-surface-variant">
-                    <IconeHistorico />
-                  </span>
-                </div>
-                {historico.length === 0 ? (
-                  <p className="text-on-surface-variant text-sm">
-                    Nenhum acerto resolvido ainda.
-                  </p>
-                ) : (
-                  <ul className="flex flex-col gap-2">
-                    {historicoVisivel.map((a) => (
-                      <li
-                        key={a.id}
-                        className="border-primary flex items-center justify-between gap-2 border-l-2 pl-2"
-                      >
-                        <div>
-                          <p className="text-on-surface text-sm font-medium">
-                            {nome(a.de.id)} → {nome(a.para.id)} ·{" "}
-                            {nomeMes(a.dataInicio)}
-                          </p>
-                          <p className="text-on-surface-variant text-xs">
-                            Resolvido em {formatarDataCurta(a.resolvidoEm)}
-                          </p>
-                        </div>
-                        <div className="flex flex-col items-end gap-0.5">
-                          <span className="text-success text-sm font-semibold">
-                            {centavosParaReais(a.valorCentavos)}
-                          </span>
-                          <span className="bg-success/15 text-success rounded-full px-2 py-0.5 text-[10px] font-semibold">
-                            PAGO
-                          </span>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                {historico.length > 3 && (
-                  <button
-                    onClick={() => setMostrarHistoricoCompleto((v) => !v)}
-                    className="border-outline-variant text-on-surface-variant hover:bg-surface-container-low rounded-lg border py-1.5 text-sm font-medium"
-                  >
-                    {mostrarHistoricoCompleto
-                      ? "Mostrar menos"
-                      : "Ver histórico completo"}
-                  </button>
-                )}
-              </div>
-
-              <div className="gap-md border-outline-variant bg-surface-container-lowest p-lg flex flex-col rounded-xl border">
-                <h3 className="text-on-surface text-base font-semibold">
-                  Impacto no orçamento
-                </h3>
-                {resumo.totalPagoPorPessoa.map((t) => {
-                  const percentual =
-                    totalPagoGeral > 0
-                      ? (t.totalCentavos / totalPagoGeral) * 100
-                      : 0;
-                  return (
-                    <div key={t.pessoaId} className="flex flex-col gap-1">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-on-surface-variant">
-                          Gasto {nome(t.pessoaId)}
-                        </span>
-                        <span className="text-on-surface font-semibold">
-                          {percentual.toFixed(1)}%
-                        </span>
-                      </div>
-                      <div className="bg-surface-container h-1.5 w-full overflow-hidden rounded-full">
-                        <div
-                          className={`h-full rounded-full ${corBarra(t.pessoaId)}`}
-                          style={{ width: `${percentual}%` }}
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
-                {resumo.insight && (
-                  <p className="bg-surface-container-low p-sm text-on-surface-variant rounded-lg text-xs">
-                    Este período {nome(resumo.insight.pessoaId)} cobriu a maior
-                    parte das despesas em {resumo.insight.categoriaNome}.
-                  </p>
-                )}
-              </div>
             </div>
           </div>
         </>

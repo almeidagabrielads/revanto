@@ -83,7 +83,7 @@ export type GrupoSemComposicao = {
   nome: string;
 };
 
-// Versão enriquecida usada pela tela de Acerto de Contas: além do saldo,
+// Versão enriquecida usada pela tela de divisão: além do saldo,
 // traz o total pago por pessoa, o detalhamento dos lançamentos do período e
 // um destaque (categoria com maior gasto + quem mais pagou nela).
 export type ResumoDivisaoGrupo = SaldoDivisaoGrupo & {
