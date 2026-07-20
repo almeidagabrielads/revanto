@@ -185,7 +185,9 @@ async function main() {
     ...new Set(validas.flatMap((l) => [l.divisao, l.pagador])),
   ].sort();
   const categorias = [
-    ...new Set(validas.map((l) => l.categoria).filter(Boolean)),
+    ...new Set(
+      validas.map((l) => l.categoria).filter((c): c is string => Boolean(c)),
+    ),
   ].sort();
 
   console.log(`Arquivo: ${CSV_PATH}`);
