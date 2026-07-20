@@ -235,6 +235,129 @@ export async function removerLancamento(
   });
 }
 
+// Primeiro e último dia do mês (0-indexado) no formato aceito por <input type="date">.
+export function intervaloDoMes(
+  ano: number,
+  mes: number,
+): { inicio: string; fim: string } {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const ultimoDia = new Date(ano, mes + 1, 0).getDate();
+  return {
+    inicio: `${ano}-${pad(mes + 1)}-01`,
+    fim: `${ano}-${pad(mes + 1)}-${pad(ultimoDia)}`,
+  };
+}
+
+export type FormLancamento = {
+  data: string;
+  descricaoPropria: string;
+  valor: string;
+  desconto: string;
+  categoriaId: string;
+  subcategoriaId: string;
+  bancoId: string;
+  pessoaDivisaoId: string;
+  pessoaPagouId: string;
+  pagoComResgateInvestimento: boolean;
+  investimentoResgateId: string;
+  tipoGasto: string;
+  parcelar: boolean;
+  quantidadeParcelas: string;
+  modoParcelamento: string;
+};
+
+// Validação do formulário de "novo lançamento" no client — não confunde com
+// o schema Zod (CriarLancamentoSchema), que valida o payload já convertido
+// para centavos no servidor.
+export function validarFormLancamento(
+  f: FormLancamento,
+  reaisParaCentavosFn: (valor: string) => number,
+): string | null {
+  if (!f.data) return "Informe a data do lançamento.";
+  if (!f.bancoId) return "Selecione o banco/cartão.";
+  if (!f.pessoaPagouId) return "Selecione quem pagou.";
+  if (!f.pessoaDivisaoId) return "Selecione a divisão.";
+  if (f.valor.trim() === "" || reaisParaCentavosFn(f.valor) === 0) {
+    return "Informe um valor diferente de zero.";
+  }
+  if (f.desconto.trim() !== "" && reaisParaCentavosFn(f.desconto) < 0) {
+    return "Desconto não pode ser negativo.";
+  }
+  if (f.parcelar) {
+    const quantidade = Number(f.quantidadeParcelas);
+    if (!Number.isInteger(quantidade) || quantidade < 2) {
+      return "Informe uma quantidade de parcelas válida (mínimo 2).";
+    }
+  }
+  return null;
+}
+
+export type RequisicaoCriarLancamento = {
+  url: string;
+  body: Record<string, unknown>;
+};
+
+// Decide entre criar um Parcelamento (várias parcelas) ou um Lançamento
+// simples, e monta o payload de cada rota — o componente só chama fetch.
+export function montarRequisicaoCriarLancamento(
+  f: FormLancamento,
+  reaisParaCentavosFn: (valor: string) => number,
+): RequisicaoCriarLancamento {
+  if (f.parcelar) {
+    return {
+      url: "/api/parcelamentos",
+      body: {
+        descricaoPropria: f.descricaoPropria || null,
+        valorParcelaCentavos: reaisParaCentavosFn(f.valor),
+        quantidadeParcelas: Number(f.quantidadeParcelas),
+        dataPrimeiraParcela: f.data,
+        modo: f.modoParcelamento,
+        categoriaId: f.categoriaId || null,
+        subcategoriaId: f.subcategoriaId || null,
+        bancoId: f.bancoId,
+        pessoaDivisaoId: f.pessoaDivisaoId,
+        pessoaPagouId: f.pessoaPagouId,
+        tipoGasto: f.tipoGasto,
+      },
+    };
+  }
+  return {
+    url: "/api/lancamentos",
+    body: {
+      data: f.data,
+      descricaoPropria: f.descricaoPropria || null,
+      valorCentavos: reaisParaCentavosFn(f.valor),
+      descontoCentavos: reaisParaCentavosFn(f.desconto),
+      categoriaId: f.categoriaId || null,
+      subcategoriaId: f.subcategoriaId || null,
+      bancoId: f.bancoId,
+      pessoaDivisaoId: f.pessoaDivisaoId,
+      pessoaPagouId: f.pessoaPagouId,
+      pagoComResgateInvestimento: f.pagoComResgateInvestimento,
+      investimentoResgateId: f.investimentoResgateId || null,
+      tipoGasto: f.tipoGasto,
+    },
+  };
+}
+
+export type ErroImportacao = { numeroLinha: number; motivo: string };
+
+// Monta o texto de resumo mostrado após o preview de importação (fora dele
+// só a parte de manipulação de DOM/download do CSV de exemplo permanece na UI).
+export function resumoImportacaoTexto(r: {
+  novas: number;
+  duplicadas: number;
+  ignoradasAntesDoPeriodo: number;
+  erros: ErroImportacao[];
+}): string {
+  const partes = [`${r.novas} pronto(s) para revisão`];
+  if (r.duplicadas > 0) partes.push(`${r.duplicadas} duplicado(s)`);
+  if (r.ignoradasAntesDoPeriodo > 0)
+    partes.push(`${r.ignoradasAntesDoPeriodo} fora do período`);
+  if (r.erros.length > 0) partes.push(`${r.erros.length} com erro de leitura`);
+  return partes.join(", ") + ".";
+}
+
 export type SugestaoDescricao = {
   descricao: string;
   categoriaId: string | null;

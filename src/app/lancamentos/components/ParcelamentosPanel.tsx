@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Select } from "../components/Select";
-import { useConfirmDialog } from "../components/ConfirmDialog";
+import { Select } from "../../components/Select";
+import { useConfirmDialog } from "../../components/ConfirmDialog";
 
 type LancamentoParcela = {
   id: string;
